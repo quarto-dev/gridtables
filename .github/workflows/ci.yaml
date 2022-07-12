@@ -1,0 +1,60 @@
+name: CI
+
+# Trigger the workflow on pull requests or when new code is pushed
+on:
+  pull_request: {}
+  push: {}
+
+jobs:
+  build:
+    name: >-
+      ghc ${{ matrix.version.ghc }}; cabal ${{ matrix.version.cabal }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        version:
+          - ghc: '8.6.5'
+            cabal: '3.2'
+          - ghc: '8.8.4'
+            cabal: '3.2'
+          - ghc: '8.10.7'
+            cabal: '3.2'
+          - ghc: '9.0.2'
+            cabal: '3.4'
+          - ghc: '9.2.3'
+            cabal: '3.6'
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install recent cabal/ghc
+        uses: haskell/actions/setup@v2
+        with:
+          ghc-version: ${{ matrix.version.ghc }}
+          cabal-version: ${{ matrix.version.cabal }}
+
+      - uses: actions/cache@v1
+        name: Cache ~/.cabal/store
+        with:
+          path: ~/.cabal/store
+          key: ${{ runner.os }}-${{ matrix.version.ghc }}-cabal
+
+      - name: Install dependencies
+        run: |
+          cabal update
+          cabal build \
+              --enable-tests \
+              --disable-optimization \
+              --dependencies-only
+
+      - name: Build
+        run: |
+          cabal build \
+              --enable-tests \
+              --disable-optimization
+
+      - name: Test
+        run: |
+          cabal test \
+              --enable-tests \
+              --disable-optimization
