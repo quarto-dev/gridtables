@@ -1,4 +1,5 @@
-{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE FlexibleContexts   #-}
 {- |
 Copyright:  © 2022 Albert Krewinkel
 License:    MIT
@@ -22,7 +23,7 @@ import qualified Data.Text as T
 
 -- | Raw grid table.
 data GridTable = GridTable
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
 
 -- | Parses a grid table.
 gridTable :: Stream s m Char
@@ -35,7 +36,7 @@ gridTable = do
 --
 -- Instances for 'Show' and 'Eq' are derived for testing purposes.
 newtype Lines = Lines [Text]
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
 
 -- | Parses the lines of a grid table.
 tableLines :: Stream s m Char
