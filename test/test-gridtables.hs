@@ -9,6 +9,7 @@ Tests for the gridtables library.
 -}
 module Main (main) where
 
+import Data.Functor.Identity (Identity)
 import Data.Either (isLeft)
 import Data.Text (Text)
 import Text.GridTable
@@ -24,29 +25,57 @@ main = defaultMain $ testGroup "gridtables"
     , gridTableTests
     ]
 
-parse' :: Parsec Text () a -> Text -> Either ParseError a
-parse' p t = parse p "<test input>" t
+parse' :: GridTableParser Identity a -> Text -> Either ParseError a
+parse' p t = runParser p emptyGridInfo "<test input>" t
 
 -- | Test parsing into lines
 linesTests :: TestTree
 linesTests = testGroup "lines"
   [ testCase "get lines" $
-    parse' tableLines "| one two |\n| three |\n| four |\n"
-    @?= Right (Lines [ "| one two |", "| three |", "| four |" ])
+    parse' tableLines "| one | two |\n| three |\n| four |\n"
+    @?= Right ([ Line 1 "| one | two |"
+               , Line 2 "| three |"
+               , Line 3 "| four |" ])
 
   , testCase "fail if not a table" $
-    assertBool "non-table cannot be parsed" .
-      isLeft $ parse' tableLines "nope\nnada\n"
+    parse' tableLines "nope\nnada\n" @?= Right []
   ]
 
 -- | Test parsing of a text as grid tables.
 gridTableTests :: TestTree
 gridTableTests = testGroup "parseGridTable"
-  [ testCase "success" $
+  [ testCase "single cell" $
     let gt = T.unlines
              [ "+-----+"
              , "| one |"
              , "+-----+"
              ]
-    in parse' gridTable gt @?= Right GridTable
+    in parse' gridTable gt @?= Right (GridTable [Cell [" one "]])
+
+  , testCase "multi-cell row" $
+    let gt = T.unlines
+             [ "+-----+-----+"
+             , "| one | two |"
+             , "+-----+-----+"
+             ]
+    in parse' gridTable gt @?=
+       Right (GridTable [Cell [" one "], Cell [" two "]])
+
+
+  , testCase "unterminated row" $
+    let gt = T.unlines
+             [ "+-----+"
+             , "| one"
+             , "+-----+"
+             ]
+    in assertBool "" . isLeft $ parse' gridTable gt
+
+  , testCase "followed by non-empty line" $
+    let gt = T.unlines
+             [ "+-----+"
+             , "| one |"
+             , "+-----+"
+             , "text"
+             ]
+    in assertBool "" . isLeft $ parse' gridTable gt
   ]
