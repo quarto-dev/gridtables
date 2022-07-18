@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveFunctor      #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts   #-}
 {-# LANGUAGE LambdaCase         #-}
@@ -26,7 +27,7 @@ import Control.Monad (void)
 import Data.Foldable (foldrM)
 import Data.Set (Set)
 import Data.Text (Text)
-import Text.Parsec hiding (Line)
+import Text.Parsec hiding (Line, choice)
 import qualified Data.Set as Set
 import qualified Data.Text as T
 
@@ -44,6 +45,28 @@ data GridInfo = GridInfo
   , colSeps :: Set CharCol
   }
 
+-- | Grid table parsing error.
+data GridError = GridError String
+  deriving stock (Eq, Ord, Show)
+
+-- | Parser for raw grid tables.
+data GridParser a
+  = Success a
+  | Failure GridError
+  deriving stock (Eq, Functor, Ord, Show)
+
+instance Applicative GridParser where
+  pure = Success
+  Failure e <*> _ = Failure e
+  Success f <*> a = fmap f a
+
+instance Monad GridParser where
+  Failure e >>= _ = Failure e
+  Success a >>= k = k a
+
+instance MonadFail GridParser where
+  fail = Failure . GridError
+
 emptyGridInfo :: GridInfo
 emptyGridInfo = GridInfo
   { rowSeps = Set.empty
@@ -58,7 +81,9 @@ gridTable :: Monad m => GridTableParser m GridTable
 gridTable = do
   lines <- tableLines
   skipMany space *> (eof <|> void newline) -- blank line
-  cells <- loop [] lines
+  cells <- case loop [] lines of
+    Failure err -> fail $ show err
+    Success cs  -> return cs
   return $ GridTable (reverse cells)
  where
   loop cells lines = traceCell lines >>= \case
@@ -102,9 +127,8 @@ data CellTrace = CellTrace Cell CharCol CharRow
                | NoTrace
 
 -- | Trace the next rectangular cell.
-traceCell :: Monad m
-          => [Line]
-          -> GridTableParser m (CellTrace, [Line])
+traceCell :: [Line]
+          -> GridParser (CellTrace, [Line])
 traceCell [] = return (NoTrace, [])
 traceCell lines = do
   (cell, unparsedLines) <- scanTopBorder lines
@@ -115,24 +139,32 @@ traceCell lines = do
            , dropWhile isParsedLine unparsedLines
            )
 
-scanTopBorder :: Monad m
-              => [Line]
-              -> GridTableParser m (Cell, [Line])  -- ^ Traced cell and remaining lines
+choice :: [GridParser a] -> GridParser a
+choice = \case
+  []            -> fail "no choice left"
+  [Failure err] -> Failure err
+  x:xs          -> case x of
+                     Failure _ -> choice xs
+                     y         -> y
+
+scanTopBorder :: [Line]
+              -> GridParser (Cell, [Line])  -- ^ Traced cell and remaining lines
 scanTopBorder [] = fail "Cannot scan top border: no lines left"
 scanTopBorder (line:lines) = choice $
   (map scanTop' . drop 1 . T.breakOnAll "+" $ lineText line)
   where
-    scanTop' (before, topUnparsed) = try $ do
+    scanTop' (before, topUnparsed) = do
       let nChars = T.length before
       nLines      <- scanLeftBorder lines
       (cellContent, unparsedRight) <-
         scanRightBorder nChars nLines (take nLines lines)
-      unparsedBelow <- scanBottomBorder nChars (drop nLines lines)
+      unparsedBelow <-
+        scanBottomBorder nChars (drop nLines lines)
       return ( Cell cellContent
              , line { lineText = topUnparsed }:unparsedRight ++ unparsedBelow)
 
 scanLeftBorder :: [Line]
-               -> GridTableParser m Int
+               -> GridParser Int
 scanLeftBorder = scanLeftBorder' 0
   where scanLeftBorder' numlines = \case
           [] -> fail "unterminated left border"
@@ -144,11 +176,10 @@ scanLeftBorder = scanLeftBorder' 0
 scanRightBorder :: Int     -- ^ Number of chars in column
                 -> Int     -- ^ Number lines
                 -> [Line]  -- ^ Table text lines
-                -> GridTableParser m ([Text], [Line])
+                -> GridParser ([Text], [Line])
 scanRightBorder nChars _nLines lines = do
   foldrM scanRightBorder' ([], []) lines
   where
-    -- scanRightBorder' :: Line -> ([Text], [Line]) -> ([Text], [Line])
     scanRightBorder' line (cellLinesAcc, unparsed) =
       case T.uncons (lineText line) of
         Nothing -> fail "empty line"
@@ -166,7 +197,7 @@ scanRightBorder nChars _nLines lines = do
 
 scanBottomBorder :: Int               -- ^ Number of chars in cell lines
                  -> [Line]
-                 -> GridTableParser m [Line]
+                 -> GridParser [Line]
 scanBottomBorder _nchars [] = fail "missing bottom border"
 scanBottomBorder nchars (line : rest) = do
   let (_, unparsed) = T.splitAt nchars (lineText line)

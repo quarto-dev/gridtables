@@ -55,6 +55,7 @@ library
   build-depends:       containers
   exposed-modules:     Text.GridTable
   other-extensions:    DerivingStrategies
+  other-extensions:    DeriveFunctor
 
 test-suite test-gridtables
   import:              common-options
