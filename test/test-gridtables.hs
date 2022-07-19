@@ -33,9 +33,9 @@ linesTests :: TestTree
 linesTests = testGroup "lines"
   [ testCase "get lines" $
     parse' tableLines "| one | two |\n| three |\n| four |\n"
-    @?= Right ([ Line 1 "| one | two |"
-               , Line 2 "| three |"
-               , Line 3 "| four |" ])
+    @?= Right ([ Line 1 0 "| one | two |"
+               , Line 2 0 "| three |"
+               , Line 3 0 "| four |" ])
 
   , testCase "fail if not a table" $
     parse' tableLines "nope\nnada\n" @?= Right []
