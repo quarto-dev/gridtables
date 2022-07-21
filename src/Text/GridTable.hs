@@ -23,9 +23,10 @@ module Text.GridTable
   , emptyGridInfo
   ) where
 
-import Prelude hiding (lines)
+import Prelude hiding (fail, lines)
 import Control.Applicative (Alternative ((<|>), empty))
 import Control.Monad (MonadPlus, void)
+import Control.Monad.Fail (MonadFail (..))
 import Control.Monad.State (StateT, evalStateT)
 import Data.Foldable (foldrM)
 import Data.Function (on)
