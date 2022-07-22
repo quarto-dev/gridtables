@@ -9,6 +9,7 @@ Tests for the gridtables library.
 -}
 module Main (main) where
 
+import Data.Array (listArray)
 import Data.Functor.Identity (Identity)
 import Data.Either (isLeft)
 import Data.Text (Text)
@@ -33,9 +34,9 @@ linesTests :: TestTree
 linesTests = testGroup "lines"
   [ testCase "get lines" $
     parse' tableLines "| one | two |\n| three |\n| four |\n"
-    @?= Right ([ Line 1 0 "| one | two |"
-               , Line 2 0 "| three |"
-               , Line 3 0 "| four |" ])
+    @?= Right ([ Line 1 1 "| one | two |"
+               , Line 2 1 "| three |"
+               , Line 3 1 "| four |" ])
 
   , testCase "fail if not a table" $
     parse' tableLines "nope\nnada\n" @?= Right []
@@ -50,7 +51,12 @@ gridTableTests = testGroup "parseGridTable"
              , "| one |"
              , "+-----+"
              ]
-    in parse' gridTable gt @?= Right (GridTable [Cell [" one "]])
+        gbounds = ( (RowIndex 1, ColIndex 1)
+                  , (RowIndex 1, ColIndex 1)
+                  )
+    in parse' gridTable gt @?=
+       Right (GridTable $ listArray gbounds
+              [ContentCell 1 1 [" one "]])
 
   , testCase "multi-cell row" $
     let gt = T.unlines
@@ -58,9 +64,25 @@ gridTableTests = testGroup "parseGridTable"
              , "| one | two |"
              , "+-----+-----+"
              ]
+        gbounds = ( (RowIndex 1, ColIndex 1)
+                  , (RowIndex 1, ColIndex 2)
+                  )
     in parse' gridTable gt @?=
-       Right (GridTable [Cell [" one "], Cell [" two "]])
+       Right (GridTable $ listArray gbounds
+              [ ContentCell 1 1 [" one "]
+              , ContentCell 1 1 [" two "]
+              ])
 
+  -- , testCase "two-row table" $
+  --   let gt = T.unlines
+  --            [ "+-----+"
+  --            , "| one |"
+  --            , "+-----+"
+  --            , "| two |"
+  --            , "+-----+"
+  --            ]
+  --   in parse' gridTable gt @?=
+  --      Right (GridTable [Cell [" one "], Cell [" two "]])
 
   , testCase "unterminated row" $
     let gt = T.unlines

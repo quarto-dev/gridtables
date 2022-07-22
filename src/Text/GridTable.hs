@@ -14,6 +14,9 @@ Parse reStructuredText-style grid tables.
 
 module Text.GridTable
   ( GridTable (..)
+  , RowIndex (..)
+  , ColIndex (..)
+  , GridCell (..)
   , Cell (..)
   , Line (..)
   , gridTable
@@ -25,20 +28,27 @@ module Text.GridTable
 
 import Prelude hiding (fail, lines)
 import Control.Applicative (Alternative ((<|>), empty))
-import Control.Monad (MonadPlus, void)
+import Control.Monad (MonadPlus, forM_, void)
 import Control.Monad.Fail (MonadFail (..))
-import Control.Monad.State (StateT, evalStateT)
+import Control.Monad.ST
+import Control.Monad.State (StateT, MonadState, runStateT, modify')
+import Data.Array
+import Data.Array.MArray
+import Data.Array.ST
 import Data.Foldable (foldrM)
 import Data.Function (on)
 import Data.Monoid (Alt (Alt, getAlt))
 import Data.Set (Set)
 import Data.Text (Text)
 import Text.Parsec hiding ((<|>), Line, choice)
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
 
--- | Raw grid table.
-data GridTable = GridTable [Cell]
+-- | Grid table: Cells are placed on a grid.
+newtype GridTable = GridTable
+  { gridTableArray :: Array CellIndex GridCell
+  }
   deriving stock (Eq, Show)
 
 -- | Raw grid table cell
@@ -47,14 +57,14 @@ newtype Cell = Cell { cellLines :: [Text] }
 
 -- | Info on the grid. Used as parser state.
 data GridInfo = GridInfo
-  { rowSeps :: Set CharRow
-  , colSeps :: Set CharCol
+  { gridRowSeps :: Set CharRow
+  , gridColSeps :: Set CharCol
   }
 
 emptyGridInfo :: GridInfo
 emptyGridInfo = GridInfo
-  { rowSeps = Set.empty
-  , colSeps = Set.empty
+  { gridRowSeps = Set.fromList [CharRow 1]
+  , gridColSeps = Set.fromList [CharCol 1]
   }
 
 -- | Grid table parsing error.
@@ -88,11 +98,17 @@ instance MonadPlus Result
 
 
 -- | Parser for raw grid tables.
-newtype GridParser a = GridParser { runGridParser :: StateT GridInfo Result a }
-  deriving newtype (Alternative, Functor, Applicative, Monad, MonadFail)
-
--- instance MonadFail GridParser where
---   fail = pure . fail
+newtype GridParser a = GridParser
+  { runGridParser :: StateT GridInfo Result a
+  }
+  deriving newtype (
+    Alternative,
+    Applicative,
+    Functor,
+    Monad,
+    MonadFail,
+    MonadState GridInfo
+  )
 
 -- | Parser type
 type GridTableParser m a = ParsecT Text GridInfo m a
@@ -102,10 +118,11 @@ gridTable :: Monad m => GridTableParser m GridTable
 gridTable = do
   lines <- tableLines
   skipMany space *> (eof <|> void newline) -- blank line
-  cells <- case flip evalStateT emptyGridInfo . runGridParser $ loop Set.empty lines of
+  (cells, gridInfo) <- case runStateT (runGridParser (loop Set.empty lines))
+                                      emptyGridInfo of
     Failure err -> fail $ show err
     Success cs  -> return cs
-  return $ tableFromScanningData cells
+  return $ tableFromScanningData gridInfo cells
  where
   loop cells lines = traceCell lines >>= \case
     Just (c, lines') -> loop (Set.insert c cells) lines'
@@ -127,7 +144,7 @@ tableLines :: Stream s m Char
 tableLines = zipWith mkLine [1..] <$> many tableLine
   where mkLine lnum txt = Line
           { lineNum = lnum
-          , lineCharPos = 0
+          , lineCharPos = 1
           , lineText = txt
           }
 
@@ -151,9 +168,11 @@ newtype CharRow = CharRow Int
   deriving newtype (Enum, Num, Ord)
 
 data CellTrace = CellTrace
-  { cellTraceContent :: Cell
+  { cellTraceContent :: [Text]
   , cellTraceLeft    :: CharCol
+  , cellTraceRight   :: CharCol
   , cellTraceTop     :: CharRow
+  , cellTraceBottom  :: CharRow
   }
   deriving stock (Eq, Show)
 
@@ -168,14 +187,17 @@ traceCell :: [Line]
           -> GridParser (Maybe (CellTrace, [Line]))
 traceCell [] = return Nothing
 traceCell lines@(line:_) = do
-  (cell, unparsedLines) <- scanTopBorder lines
+  (cell, width, unparsedLines) <- scanTopBorder lines
   let isParsedLine line' = case T.uncons (lineText line') of
         Just (_, "") -> True
         _            -> False
+      top = lineNum line
   let cellTrace = CellTrace
-        { cellTraceContent = cell
+        { cellTraceContent = cellLines cell
         , cellTraceLeft    = lineCharPos line
+        , cellTraceRight   = lineCharPos line + CharCol width
         , cellTraceTop     = lineNum line
+        , cellTraceBottom  = top + CharRow (length $ cellLines cell) + 1
         }
 
   return . Just $
@@ -187,7 +209,8 @@ choice :: [GridParser a] -> GridParser a
 choice = getAlt . mconcat . map Alt
 
 scanTopBorder :: [Line]
-              -> GridParser (Cell, [Line])  -- ^ Traced cell and remaining lines
+              -> GridParser (Cell, Int, [Line])  -- ^ Traced cell, its width,
+                                                 -- and remaining lines
 scanTopBorder [] = fail "Cannot scan top border: no lines left"
 scanTopBorder (line:lines) = choice $
   (map scanTop' . drop 1 . T.breakOnAll "+" $ lineText line)
@@ -199,7 +222,12 @@ scanTopBorder (line:lines) = choice $
         scanRightBorder nChars nLines (take nLines lines)
       unparsedBelow <-
         scanBottomBorder nChars (drop nLines lines)
+      modify' $ \gi -> gi { gridColSeps =
+                            Set.insert (CharCol nChars + lineCharPos line)
+                                       (gridColSeps gi)
+                          }
       return ( Cell cellContent
+             , nChars
              , line { lineText = topUnparsed
                     , lineCharPos = lineCharPos line + CharCol (T.length before)
                     }
@@ -247,9 +275,97 @@ scanBottomBorder :: Int               -- ^ Number of chars in cell lines
 scanBottomBorder _nchars [] = fail "missing bottom border"
 scanBottomBorder nchars (line : rest) = do
   let (_, unparsed) = T.splitAt nchars (lineText line)
+  let bottom = lineNum line
+  modify' $ \gi -> gi { gridRowSeps = Set.insert bottom $ gridRowSeps gi }
   return (line { lineText = unparsed } : rest)
 
 -- | Create a final grid table from line scanning data.
-tableFromScanningData :: Set CellTrace -> GridTable
-tableFromScanningData cells =
-  GridTable (map cellTraceContent $ Set.toAscList cells)
+tableFromScanningData :: GridInfo -> Set CellTrace -> GridTable
+tableFromScanningData gridInfo cells =
+  let rowseps = Set.toAscList $ gridRowSeps gridInfo
+      colseps = Set.toAscList $ gridColSeps gridInfo
+      rowindex = Map.fromList $ zip rowseps [1..]
+      colindex = Map.fromList $ zip colseps [1..]
+      nrows = Map.size rowindex - 1
+      ncols = Map.size colindex - 1
+      gbounds = ( (RowIndex 1, ColIndex 1)
+                , (RowIndex nrows, ColIndex ncols)
+                )
+      mutableTableGrid :: ST s (STArray s CellIndex GridCell)
+      mutableTableGrid = do
+        tblgrid <- newArray gbounds FreeCell
+        forM_ (Set.toAscList cells) $
+          \(CellTrace content left right top bottom) -> do
+            let cellPos = do
+                  rnum <- Map.lookup top rowindex
+                  cnum <- Map.lookup left colindex
+                  rs   <- RowSpan . fromRowIndex . (subtract rnum) <$>
+                          Map.lookup bottom rowindex
+                  -- let rs = 1
+                  cs   <- ColSpan . fromColIndex . (subtract cnum) <$>
+                          Map.lookup right colindex
+                  pure ((rnum, cnum), rs, cs)
+            let (idx, rowspan, colspan) = case cellPos of
+                  Just cp -> cp
+                  Nothing -> error "A cell or row index was not found"
+            writeArray tblgrid idx . FilledCell $
+              ContentCell rowspan colspan content
+            forM_ (continuationIndices idx rowspan colspan) $ \contIdx -> do
+              -- FIXME: ensure that the cell has not been filled yet
+              writeArray tblgrid contIdx . FilledCell $ ContinuationCell contIdx
+            -- Swap BuilderCells with normal GridCells.
+        let fromBuilderCell :: BuilderCell -> GridCell
+            fromBuilderCell = \case
+              FilledCell c -> c
+              FreeCell     -> error $ "Found an unassigned cell."
+        getAssocs tblgrid >>= (\kvs -> forM_ kvs $ \(idx, bc) ->
+          case bc of
+            FreeCell -> error $ "unassigned: " ++ show idx
+            _ -> pure ())
+        mapArray fromBuilderCell tblgrid
+  in GridTable $ runSTArray mutableTableGrid
+
+continuationIndices :: (RowIndex, ColIndex)
+                    -> RowSpan -> ColSpan
+                    -> [CellIndex]
+continuationIndices (RowIndex ridx, ColIndex cidx) rowspan colspan =
+  let (RowSpan rs) = rowspan
+      (ColSpan cs) = colspan
+  in [ (RowIndex r, ColIndex c) | r <- [ridx..(ridx + rs - 1)]
+                                , c <- [cidx..(cidx + cs - 1)]
+                                , (r, c) /= (ridx, cidx)]
+
+-- | Row index in a table array.
+newtype RowIndex = RowIndex { fromRowIndex :: Int }
+  deriving stock (Eq, Ix, Ord)
+  deriving newtype (Enum, Num, Show)
+
+-- | Column index in a table array.
+newtype ColIndex = ColIndex { fromColIndex :: Int }
+  deriving stock (Eq, Ix, Ord)
+  deriving newtype (Enum, Num, Show)
+
+-- | Index to a cell in a table part.
+type CellIndex = (RowIndex, ColIndex)
+
+-- | A grid cell contains either a real table cell, or is the
+-- continuation of a column or row-spanning cell. In the latter case,
+-- the index of the continued cell is provided.
+data GridCell
+  = ContentCell RowSpan ColSpan [Text]
+  | ContinuationCell CellIndex
+  deriving stock (Eq, Show)
+
+data BuilderCell
+  = FilledCell GridCell
+  | FreeCell
+
+-- | The number of rows spanned by a cell.
+newtype RowSpan = RowSpan Int
+  deriving stock (Eq, Ord)
+  deriving newtype (Enum, Num, Read, Show)
+
+-- | The number of columns spanned by a cell.
+newtype ColSpan = ColSpan Int
+  deriving stock (Eq, Ord)
+  deriving newtype (Enum, Num, Read, Show)
