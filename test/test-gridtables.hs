@@ -33,13 +33,14 @@ parse' p t = runParser p emptyGridInfo "<test input>" t
 linesTests :: TestTree
 linesTests = testGroup "lines"
   [ testCase "get lines" $
-    parse' tableLines "| one | two |\n| three |\n| four |\n"
-    @?= Right ([ Line 1 1 "| one | two |"
-               , Line 2 1 "| three |"
-               , Line 3 1 "| four |" ])
+    parse' (many1 tableLine) "| one | two |\n| three |\n| four |\n"
+    @?= Right ([ "| one | two |"
+               , "| three |"
+               , "| four |"
+               ])
 
   , testCase "fail if not a table" $
-    parse' tableLines "nope\nnada\n" @?= Right []
+    parse' (many tableLine) "nope\nnada\n" @?= Right []
   ]
 
 -- | Test parsing of a text as grid tables.
@@ -73,16 +74,41 @@ gridTableTests = testGroup "parseGridTable"
               , ContentCell 1 1 [" two "]
               ])
 
-  -- , testCase "two-row table" $
-  --   let gt = T.unlines
-  --            [ "+-----+"
-  --            , "| one |"
-  --            , "+-----+"
-  --            , "| two |"
-  --            , "+-----+"
-  --            ]
-  --   in parse' gridTable gt @?=
-  --      Right (GridTable [Cell [" one "], Cell [" two "]])
+  , testCase "two-row table" $
+    let gt = T.unlines
+             [ "+-----+"
+             , "| one |"
+             , "+-----+"
+             , "| two |"
+             , "+-----+"
+             ]
+        gbounds = ( (RowIndex 1, ColIndex 1)
+                  , (RowIndex 2, ColIndex 1)
+                  )
+    in parse' gridTable gt @?=
+       Right (GridTable $ listArray gbounds
+              [ ContentCell 1 1 [" one "]
+              , ContentCell 1 1 [" two "]
+              ])
+
+  , testCase "rowspan" $
+    let gt = T.unlines
+             [ "+-----+-------+"
+             , "| one | two   |"
+             , "|     +-------+"
+             , "|     | three |"
+             , "+-----+-------+"
+             ]
+        gbounds = ( (RowIndex 1, ColIndex 1)
+                  , (RowIndex 2, ColIndex 2)
+                  )
+    in parse' gridTable gt @?=
+       Right (GridTable $ listArray gbounds
+              [ ContentCell 2 1 [" one ", "     ", "     "]
+              , ContentCell 1 1 [" two   "]
+              , ContinuationCell (1, 1)
+              , ContentCell 1 1 [" three "]
+              ])
 
   , testCase "unterminated row" $
     let gt = T.unlines
@@ -90,7 +116,13 @@ gridTableTests = testGroup "parseGridTable"
              , "| one"
              , "+-----+"
              ]
-    in assertBool "" . isLeft $ parse' gridTable gt
+        gbounds = ( (RowIndex 1, ColIndex 1)
+                  , (RowIndex 1, ColIndex 1)
+                  )
+    in parse' gridTable gt @?=
+       Right (GridTable $ listArray gbounds
+              [ ContentCell 1 1 [" one"]
+              ])
 
   , testCase "followed by non-empty line" $
     let gt = T.unlines
