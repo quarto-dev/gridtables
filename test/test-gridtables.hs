@@ -11,12 +11,11 @@ module Main (main) where
 
 import Data.Array (listArray)
 import Data.Functor.Identity (Identity)
-import Data.Either (isLeft)
 import Data.Text (Text)
 import Text.GridTable
 import Text.Parsec
 import Test.Tasty (TestTree, defaultMain, testGroup)
-import Test.Tasty.HUnit ((@?=), assertBool, testCase)
+import Test.Tasty.HUnit ((@?=), testCase)
 
 import qualified Data.Text as T
 
@@ -188,11 +187,23 @@ gridTableTests = testGroup "parseGridTable"
               })
 
   , testCase "followed by non-empty line" $
-    let gt = T.unlines
+    let ls = T.unlines
              [ "+-----+"
              , "| one |"
              , "+-----+"
              , "text"
              ]
-    in assertBool "" . isLeft $ parse' gridTable gt
+    in parse' (gridTable *> many1 letter) ls @?=
+       Right "text"
+
+  , testCase "followed by non-empty line after blank line" $
+    let gt = T.unlines
+             [ "+-----+"
+             , "| one |"
+             , "+-----+"
+             , ""
+             , "Hi Mom!"
+             ]
+    in parse' (gridTable *> newline *> many1 (letter <|> space)) gt @?=
+       Right "Hi Mom"
   ]
