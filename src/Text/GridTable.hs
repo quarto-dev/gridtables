@@ -25,12 +25,9 @@ module Text.GridTable
   , tableLine
   ) where
 
-import Prelude hiding (fail, lines)
-import Control.Applicative (Alternative ((<|>), empty))
-import Control.Monad (MonadPlus, forM_, void)
-import Control.Monad.Fail (MonadFail (..))
+import Prelude hiding (lines)
+import Control.Monad (forM_, void)
 import Control.Monad.ST
-import Control.Monad.State (StateT, MonadState, runStateT, gets, modify', put)
 import Data.Array
 import Data.Array.MArray
 import Data.Array.ST
@@ -38,7 +35,7 @@ import Data.Function (on)
 import Data.Maybe (catMaybes)
 import Data.Set (Set)
 import Data.Text (Text)
-import Text.Parsec hiding ((<|>), Line, choice)
+import Text.Parsec
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
@@ -69,66 +66,58 @@ emptyGridInfo = GridInfo
   , gridCells   = Set.fromList []
   }
 
--- | Get the next corner an remove it from the set of unparsed corners.
-popCorner :: GridParser (Maybe CharIndex)
-popCorner = do
-  corners <- gets gridCorners
-  case Set.minView corners of
-    Nothing -> do
-      modify' $ \gi -> gi { gridCorners = Set.empty }
-      return Nothing
-    Just (next, rest) -> do
-      modify' $ \gi -> gi { gridCorners = rest }
-      return $ Just next
-
-scanCharGrid :: CharGrid -> GridParser (Set CellTrace)
-scanCharGrid charGrid =
-  popCorner >>= \case
-    Nothing ->
-      gets gridCells
-    Just startIdx@(top, left) ->
-      scanCell charGrid startIdx >>= \case
-        Nothing -> scanCharGrid charGrid
+scanCharGrid :: CharGrid -> GridInfo -> GridInfo
+scanCharGrid charGrid gridInfo =
+  -- Get the next corner an remove it from the set of unparsed corners.
+  case Set.minView (gridCorners gridInfo) of
+    Nothing -> gridInfo
+    Just (startIdx@(top, left), corners) ->
+      case scanCell charGrid startIdx of
+        Nothing ->
+          -- Corner is not a top-left corner of another cell. Continue
+          -- with the remaining corners.
+          scanCharGrid charGrid gridInfo { gridCorners = corners }
         Just ((bottom, right), newrowseps, newcolseps) -> do
           let content = getLines charGrid startIdx (bottom, right)
           let cell = CellTrace content left right top bottom
-          rowseps <- gets gridRowSeps
-          colseps <- gets gridColSeps
-          corners <- gets gridCorners
-          cells   <- gets gridCells
-          put $ GridInfo
+          let rowseps = gridRowSeps gridInfo
+          let colseps = gridColSeps gridInfo
+          let cells   = gridCells gridInfo
+          scanCharGrid charGrid $ GridInfo
             { gridRowSeps = newrowseps `Set.union` rowseps
             , gridColSeps = newcolseps `Set.union` colseps
             , gridCorners = Set.insert (top, right) $
                             Set.insert (bottom, left) corners
             , gridCells = cell `Set.insert` cells
             }
-          scanCharGrid charGrid
 
 type ScanResult = (CharIndex, Set CharRow, Set CharCol)
 
 type RowSeps = Set CharRow
 type ColSeps = Set CharCol
 
-scanCell :: CharGrid -> CharIndex -> GridParser (Maybe ScanResult)
+scanCell :: CharGrid -> CharIndex -> Maybe ScanResult
 scanCell = scanRight
 
-scanRight :: CharGrid -> CharIndex -> GridParser (Maybe ScanResult)
+scanRight :: CharGrid -> CharIndex -> Maybe ScanResult
 scanRight charGrid start@(top, left) = do
   loop Set.empty (left + 1)
   where
-    loop :: ColSeps -> CharCol -> GridParser (Maybe ScanResult)
+    loop :: ColSeps -> CharCol -> Maybe ScanResult
     loop colseps j
-      | not (bounds charGrid `inRange` (top, j)) = return Nothing
+      | not (bounds charGrid `inRange` (top, j)) = Nothing
       | otherwise = case charGrid ! (top, j) of
           Just '-' -> loop colseps (j + 1)
-          Just '+' -> do
+          Just '+' ->
             let colseps' = Set.insert j colseps
-            case scanDown charGrid start j of
-              Nothing -> loop colseps' (j + 1)
-              Just (end, rowseps, newcolseps) -> pure $
-                Just (end, rowseps, colseps' `Set.union` newcolseps)
-          _ -> return Nothing
+            in case scanDown charGrid start j of
+                 Nothing -> loop colseps' (j + 1)
+                 Just (end, rowseps, newcolseps) -> pure $
+                   ( end
+                   , rowseps
+                   , colseps' `Set.union` newcolseps
+                   )
+          _ -> Nothing
 
 scanDown :: CharGrid -> CharIndex -> CharCol
          -> Maybe ScanResult
@@ -196,64 +185,19 @@ getLines charGrid (top, left) (bottom, right) =
                  map (\ic -> charGrid ! (ir, ic)) columns)
          rows
 
-
--- | Grid table parsing error.
-data GridError = GridError String
-  deriving stock (Eq, Ord, Show)
-
--- | Parse result.
-data Result a
-  = Success a
-  | Failure GridError
-  deriving stock (Eq, Functor, Ord, Show)
-
-instance Applicative Result where
-  pure = Success
-  Failure e <*> _ = Failure e
-  Success f <*> a = fmap f a
-
-instance Monad Result where
-  Failure e >>= _ = Failure e
-  Success a >>= k = k a
-
-instance MonadFail Result where
-  fail = Failure . GridError
-
-instance Alternative Result where
-  empty = Failure (GridError "empty")
-  (Failure _) <|> x = x
-  (Success s) <|> _ = Success s
-
-instance MonadPlus Result
-
-
--- | Parser for raw grid tables.
-newtype GridParser a = GridParser
-  { runGridParser :: StateT GridInfo Result a
-  }
-  deriving newtype (
-    Alternative,
-    Applicative,
-    Functor,
-    Monad,
-    MonadFail,
-    MonadState GridInfo
-  )
-
 -- | Parser type
 type GridTableParser m a = ParsecT Text GridInfo m a
 
 -- | Parses a grid table.
-gridTable :: Monad m => GridTableParser m GridTable
+gridTable :: Monad m => ParsecT Text u m GridTable
 gridTable = do
   lines <- many1 tableLine
   skipMany space *> (eof <|> void newline) -- blank line
   let charGrid = toCharGrid lines
-  (cells, gridInfo) <- case runStateT (runGridParser (scanCharGrid charGrid))
-                                      emptyGridInfo of
-    Failure err -> fail $ show err
-    Success cs  -> return cs
-  return $ tableFromScanningData gridInfo cells
+  let gridInfo = scanCharGrid charGrid emptyGridInfo
+  if Set.null (gridCells gridInfo)
+    then fail "no cells"
+    else return $ tableFromScanningData gridInfo
 
 type CharGrid = Array (CharRow, CharCol) (Maybe Char)
 
@@ -306,9 +250,10 @@ instance Ord CellTrace where
       o  -> o
 
 -- | Create a final grid table from line scanning data.
-tableFromScanningData :: GridInfo -> Set CellTrace -> GridTable
-tableFromScanningData gridInfo cells =
-  let rowseps = Set.toAscList $ gridRowSeps gridInfo
+tableFromScanningData :: GridInfo -> GridTable
+tableFromScanningData gridInfo =
+  let cells   = gridCells gridInfo
+      rowseps = Set.toAscList $ gridRowSeps gridInfo
       colseps = Set.toAscList $ gridColSeps gridInfo
       rowindex = Map.fromList $ zip rowseps [1..]
       colindex = Map.fromList $ zip colseps [1..]
