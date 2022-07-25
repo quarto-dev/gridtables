@@ -23,6 +23,7 @@ module Text.GridTable
   , GridInfo (..)
   , emptyGridInfo
   , tableLine
+  , mapCells
   ) where
 
 import Prelude hiding (lines)
@@ -50,8 +51,23 @@ data GridTable a = GridTable
   }
   deriving stock (Eq, Show)
 
+-- | Apply a function to all cell contents in a grid table.
+mapCells :: (a -> b) -> GridTable a -> GridTable b
+mapCells f gt =
+  let f' = \case
+        ContentCell rs cs c  -> ContentCell rs cs $ f c
+        ContinuationCell idx -> ContinuationCell idx
+      cellArray = runSTArray $ do
+        mut <- thaw $ gridTableArray gt
+        mapArray f' mut
+  in gt { gridTableArray = cellArray }
+
 -- | Raw grid table cell
-newtype Cell = Cell { cellLines :: [Text] }
+data Cell a = Cell
+  { cellContent :: a
+  , cellRowSpan :: Int
+  , cellColSpan :: Int
+  }
   deriving stock (Eq, Ord, Show)
 
 -- | Info on the grid. Used as parser state.
