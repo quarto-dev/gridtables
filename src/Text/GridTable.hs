@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -34,7 +33,7 @@ import Data.Array
 import Data.Array.MArray
 import Data.Array.ST
 import Data.Function (on)
-import Data.Maybe (catMaybes)
+import Data.Maybe (mapMaybe)
 import Data.Set (Set)
 import Data.Text (Text)
 import Text.DocLayout (charWidth)
@@ -146,7 +145,7 @@ scanRight charGrid start@(top, left) = do
             let colseps' = Set.insert j colseps
             in case scanDown charGrid start j of
                  Nothing -> loop colseps' (j + 1)
-                 Just (end, rowseps, newcolseps) -> pure $
+                 Just (end, rowseps, newcolseps) -> pure
                    ( end
                    , rowseps
                    , colseps' `Set.union` newcolseps
@@ -197,7 +196,6 @@ scanLeft charGrid start@(_top,left) end@(bottom, right) =
            case scanUp charGrid start end of
              Just rowseps -> Just (rowseps, colseps)
              Nothing      -> Nothing
- where
 
 scanUp :: CharGrid -> CharIndex -> CharIndex
        -> Maybe RowSeps
@@ -215,8 +213,7 @@ getLines :: CharGrid -> CharIndex -> CharIndex -> [Text]
 getLines charGrid (top, left) (bottom, right) =
   let rows = [top + 1 .. bottom - 1]
       columns = [left + 1 .. right - 1]
-  in map (\ir -> T.pack . catMaybes $
-                 map (\ic -> charGrid ! (ir, ic)) columns)
+  in map (\ir -> T.pack $ mapMaybe (\ic -> charGrid ! (ir, ic)) columns)
          rows
 
 -- | Parser type
@@ -248,9 +245,9 @@ toCharGrid lines =
       charList c = case charWidth c of
                      2 -> [Just c, Nothing]
                      _ -> [Just c]
-      extendedLines =   map (\line -> take chars (line ++ repeat Nothing))
-                      . map (concatMap charList . T.unpack)
-                      $ lines
+      extendedLines = map ((\line -> take chars (line ++ repeat Nothing))
+                            . concatMap charList . T.unpack)
+                          lines
   in listArray gbounds (mconcat extendedLines)
 
 -- | Parses a line that's part of a table. The line must start with
@@ -300,7 +297,7 @@ tableFromScanningData gridInfo bodySeps =
       gbounds = ( (RowIndex 1, ColIndex 1)
                 , (RowIndex nrows, ColIndex ncols)
                 )
-      colwidths = [ b - a - 1 | (b, a) <- zip (tail colseps) (colseps) ]
+      colwidths = [ b - a - 1 | (b, a) <- zip (tail colseps) colseps ]
       mutableTableGrid :: ST s (STArray s CellIndex GridCell)
       mutableTableGrid = do
         tblgrid <- newArray gbounds FreeCell
@@ -309,9 +306,9 @@ tableFromScanningData gridInfo bodySeps =
             let cellPos = do
                   rnum <- Map.lookup top rowindex
                   cnum <- Map.lookup left colindex
-                  rs   <- RowSpan . fromRowIndex . (subtract rnum) <$>
+                  rs   <- RowSpan . fromRowIndex . subtract rnum <$>
                           Map.lookup bottom rowindex
-                  cs   <- ColSpan . fromColIndex . (subtract cnum) <$>
+                  cs   <- ColSpan . fromColIndex . subtract cnum <$>
                           Map.lookup right colindex
                   pure ((rnum, cnum), rs, cs)
             let (idx, rowspan, colspan) = case cellPos of
@@ -327,7 +324,7 @@ tableFromScanningData gridInfo bodySeps =
         let fromBuilderCell :: BuilderCell -> GridCell
             fromBuilderCell = \case
               FilledCell c -> c
-              FreeCell     -> error $ "Found an unassigned cell."
+              FreeCell     -> error "Found an unassigned cell."
         getAssocs tblgrid >>= (\kvs -> forM_ kvs $ \(idx, bc) ->
           case bc of
             FreeCell -> error $ "unassigned: " ++ show idx
@@ -335,8 +332,8 @@ tableFromScanningData gridInfo bodySeps =
         mapArray fromBuilderCell tblgrid
   in GridTable
      { gridTableArray = runSTArray mutableTableGrid
-     , gridTableHead = (subtract 1) <$> foldr (<|>) Nothing
-                       (map (`Map.lookup` rowindex) bodySeps)
+     , gridTableHead = subtract 1 <$>
+                       foldr ((<|>) . (`Map.lookup` rowindex)) Nothing bodySeps
      , gridTableColWidths = map fromCharCol colwidths
      }
 
