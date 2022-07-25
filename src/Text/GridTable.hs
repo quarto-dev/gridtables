@@ -27,7 +27,7 @@ module Text.GridTable
 
 import Prelude hiding (lines)
 import Control.Applicative ((<|>))
-import Control.Monad (forM_, void)
+import Control.Monad (forM_)
 import Control.Monad.ST
 import Data.Array
 import Data.Array.MArray
@@ -43,8 +43,8 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 
 -- | Grid table: Cells are placed on a grid.
-data GridTable = GridTable
-  { gridTableArray :: Array CellIndex GridCell
+data GridTable a = GridTable
+  { gridTableArray :: Array CellIndex (GridCell a)
   , gridTableHead  :: Maybe RowIndex
   , gridTableColWidths :: [Int]
   }
@@ -220,7 +220,7 @@ getLines charGrid (top, left) (bottom, right) =
 type GridTableParser m a = ParsecT Text GridInfo m a
 
 -- | Parses a grid table.
-gridTable :: Stream s m Char => ParsecT s u m GridTable
+gridTable :: Stream s m Char => ParsecT s u m (GridTable [Text])
 gridTable = try $ do
   firstLine <- manyTill (oneOf "+-") newline
   lines <- many1 tableLine
@@ -286,7 +286,7 @@ instance Ord CellTrace where
       o  -> o
 
 -- | Create a final grid table from line scanning data.
-tableFromScanningData :: GridInfo -> [CharRow] -> GridTable
+tableFromScanningData :: GridInfo -> [CharRow] -> GridTable [Text]
 tableFromScanningData gridInfo bodySeps =
   let rowseps = Set.toAscList $ gridRowSeps gridInfo
       colseps = Set.toAscList $ gridColSeps gridInfo
@@ -298,7 +298,7 @@ tableFromScanningData gridInfo bodySeps =
                 , (RowIndex nrows, ColIndex ncols)
                 )
       colwidths = [ b - a - 1 | (b, a) <- zip (tail colseps) colseps ]
-      mutableTableGrid :: ST s (STArray s CellIndex GridCell)
+      mutableTableGrid :: ST s (STArray s CellIndex (GridCell [Text]))
       mutableTableGrid = do
         tblgrid <- newArray gbounds FreeCell
         forM_ (Set.toAscList $ gridCells gridInfo) $
@@ -321,7 +321,7 @@ tableFromScanningData gridInfo bodySeps =
               writeArray tblgrid contIdx $
                 FilledCell (ContinuationCell idx)
             -- Swap BuilderCells with normal GridCells.
-        let fromBuilderCell :: BuilderCell -> GridCell
+        let fromBuilderCell :: BuilderCell -> GridCell [Text]
             fromBuilderCell = \case
               FilledCell c -> c
               FreeCell     -> error "Found an unassigned cell."
@@ -363,13 +363,13 @@ type CellIndex = (RowIndex, ColIndex)
 -- | A grid cell contains either a real table cell, or is the
 -- continuation of a column or row-spanning cell. In the latter case,
 -- the index of the continued cell is provided.
-data GridCell
-  = ContentCell RowSpan ColSpan [Text]
+data GridCell a
+  = ContentCell RowSpan ColSpan a
   | ContinuationCell CellIndex
   deriving stock (Eq, Show)
 
 data BuilderCell
-  = FilledCell GridCell
+  = FilledCell (GridCell [Text])
   | FreeCell
 
 -- | The number of rows spanned by a cell.
