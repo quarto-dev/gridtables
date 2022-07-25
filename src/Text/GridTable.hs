@@ -220,7 +220,7 @@ getLines charGrid (top, left) (bottom, right) =
 type GridTableParser m a = ParsecT Text GridInfo m a
 
 -- | Parses a grid table.
-gridTable :: Monad m => ParsecT Text u m GridTable
+gridTable :: Stream s m Char => ParsecT s u m GridTable
 gridTable = do
   lines <- many1 tableLine
   skipMany space *> (eof <|> void newline) -- blank line
