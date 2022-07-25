@@ -59,6 +59,7 @@ gridTableTests = testGroup "parseGridTable"
        Right (GridTable
               { gridTableArray = listArray gbounds [ContentCell 1 1 [" one "]]
               , gridTableHead = Nothing
+              , gridTableColWidths = [5]
               })
 
   , testCase "multi-cell row" $
@@ -77,6 +78,7 @@ gridTableTests = testGroup "parseGridTable"
                                  , ContentCell 1 1 [" two "]
                                  ]
               , gridTableHead = Nothing
+              , gridTableColWidths = [5, 5]
               })
 
 
@@ -96,6 +98,7 @@ gridTableTests = testGroup "parseGridTable"
                                  , ContentCell 1 1 [" fish "]
                                  ]
               , gridTableHead = Nothing
+              , gridTableColWidths = [4, 6]
               })
 
   , testCase "two-row table" $
@@ -116,6 +119,7 @@ gridTableTests = testGroup "parseGridTable"
                                  , ContentCell 1 1 [" two "]
                                  ]
               , gridTableHead = Nothing
+              , gridTableColWidths = [5]
               })
 
   , testCase "rowspan" $
@@ -138,6 +142,7 @@ gridTableTests = testGroup "parseGridTable"
                 , ContentCell 1 1 [" three "]
                 ]
               , gridTableHead = Nothing
+              , gridTableColWidths = [5, 7]
               })
 
   , testGroup "table head"
@@ -161,6 +166,7 @@ gridTableTests = testGroup "parseGridTable"
                   , ContentCell 1 1 ["  2  "]
                   ]
                 , gridTableHead = Just 1
+                , gridTableColWidths = [5, 5]
                 })
     ]
 
@@ -178,6 +184,7 @@ gridTableTests = testGroup "parseGridTable"
               { gridTableArray = listArray gbounds
                                  [ ContentCell 1 1 [" one"]]
               , gridTableHead = Nothing
+                , gridTableColWidths = [5]
               })
 
   , testCase "followed by non-empty line" $

@@ -47,6 +47,7 @@ import qualified Data.Text as T
 data GridTable = GridTable
   { gridTableArray :: Array CellIndex GridCell
   , gridTableHead  :: Maybe RowIndex
+  , gridTableColWidths :: [Int]
   }
   deriving stock (Eq, Show)
 
@@ -268,7 +269,7 @@ newtype CharRow = CharRow Int
   deriving newtype (Enum, Ix, Num, Ord)
 
 -- | Character column
-newtype CharCol = CharCol Int
+newtype CharCol = CharCol { fromCharCol :: Int }
   deriving stock (Eq, Show)
   deriving newtype (Enum, Ix, Num, Ord)
 
@@ -290,8 +291,7 @@ instance Ord CellTrace where
 -- | Create a final grid table from line scanning data.
 tableFromScanningData :: GridInfo -> [CharRow] -> GridTable
 tableFromScanningData gridInfo bodySeps =
-  let cells   = gridCells gridInfo
-      rowseps = Set.toAscList $ gridRowSeps gridInfo
+  let rowseps = Set.toAscList $ gridRowSeps gridInfo
       colseps = Set.toAscList $ gridColSeps gridInfo
       rowindex = Map.fromList $ zip rowseps [1..]
       colindex = Map.fromList $ zip colseps [1..]
@@ -300,10 +300,11 @@ tableFromScanningData gridInfo bodySeps =
       gbounds = ( (RowIndex 1, ColIndex 1)
                 , (RowIndex nrows, ColIndex ncols)
                 )
+      colwidths = [ b - a - 1 | (b, a) <- zip (tail colseps) (colseps) ]
       mutableTableGrid :: ST s (STArray s CellIndex GridCell)
       mutableTableGrid = do
         tblgrid <- newArray gbounds FreeCell
-        forM_ (Set.toAscList cells) $
+        forM_ (Set.toAscList $ gridCells gridInfo) $
           \(CellTrace content left right top bottom) -> do
             let cellPos = do
                   rnum <- Map.lookup top rowindex
@@ -336,6 +337,7 @@ tableFromScanningData gridInfo bodySeps =
      { gridTableArray = runSTArray mutableTableGrid
      , gridTableHead = (subtract 1) <$> foldr (<|>) Nothing
                        (map (`Map.lookup` rowindex) bodySeps)
+     , gridTableColWidths = map fromCharCol colwidths
      }
 
 continuationIndices :: (RowIndex, ColIndex)
