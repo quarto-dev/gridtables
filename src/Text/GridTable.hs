@@ -37,6 +37,7 @@ import Data.Function (on)
 import Data.Maybe (catMaybes)
 import Data.Set (Set)
 import Data.Text (Text)
+import Text.DocLayout (charWidth)
 import Text.Parsec hiding ((<|>))
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -243,8 +244,11 @@ toCharGrid lines =
       gbounds = ( (CharRow 1, CharCol 1)
                 , (CharRow (length lines), CharCol chars)
                 )
+      charList c = case charWidth c of
+                     2 -> [Just c, Nothing]
+                     _ -> [Just c]
       extendedLines =   map (\line -> take chars (line ++ repeat Nothing))
-                      . map (map Just . T.unpack)
+                      . map (concatMap charList . T.unpack)
                       $ lines
   in listArray gbounds (mconcat extendedLines)
 

@@ -54,6 +54,7 @@ library
   import:              common-options
   hs-source-dirs:      src
   build-depends:       containers
+                     , doclayout
   exposed-modules:     Text.GridTable
   other-extensions:    DeriveFunctor
                      , DerivingStrategies

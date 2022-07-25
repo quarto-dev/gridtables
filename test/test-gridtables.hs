@@ -79,6 +79,25 @@ gridTableTests = testGroup "parseGridTable"
               , gridTableHead = Nothing
               })
 
+
+  , testCase "wide character" $
+    let gt = T.unlines
+             [ "+----+------+"
+             , "| 魚 | fish |"
+             , "+----+------+"
+             ]
+        gbounds = ( (RowIndex 1, ColIndex 1)
+                  , (RowIndex 1, ColIndex 2)
+                  )
+    in parse' gridTable gt @?=
+       Right (GridTable
+              { gridTableArray = listArray gbounds
+                                 [ ContentCell 1 1 [" 魚 "]
+                                 , ContentCell 1 1 [" fish "]
+                                 ]
+              , gridTableHead = Nothing
+              })
+
   , testCase "two-row table" $
     let gt = T.unlines
              [ "+-----+"
