@@ -24,6 +24,7 @@ module Text.GridTable
   , emptyGridInfo
   , tableLine
   , mapCells
+  , rows
   ) where
 
 import Prelude hiding (lines)
@@ -33,6 +34,7 @@ import Control.Monad.ST
 import Data.Array
 import Data.Array.MArray
 import Data.Array.ST
+import Data.Bifunctor (bimap)
 import Data.Function (on)
 import Data.Maybe (mapMaybe)
 import Data.Set (Set)
@@ -62,11 +64,28 @@ mapCells f gt =
         mapArray f' mut
   in gt { gridTableArray = cellArray }
 
+colBounds :: Array CellIndex a -> (ColIndex, ColIndex)
+colBounds = bimap snd snd . bounds
+
+rows :: GridTable a -> [[Cell a]]
+rows gt =
+  let tarr = gridTableArray gt
+      ncols = fromColIndex . uncurry (flip (-)) $ colBounds tarr
+      toSimpleCell = \case
+        ContentCell rs cs c -> Just $ Cell c rs cs
+        ContinuationCell {} -> Nothing
+      mkRows :: [[Cell a]] -> [GridCell a] -> [[Cell a]]
+      mkRows rs = \case
+        [] -> reverse rs
+        xs -> let (r, xs') = splitAt (ncols + 1) xs
+              in mkRows (mapMaybe toSimpleCell r:rs) xs'
+  in mkRows [] $ elems tarr
+
 -- | Raw grid table cell
 data Cell a = Cell
   { cellContent :: a
-  , cellRowSpan :: Int
-  , cellColSpan :: Int
+  , cellRowSpan :: RowSpan
+  , cellColSpan :: ColSpan
   }
   deriving stock (Eq, Ord, Show)
 

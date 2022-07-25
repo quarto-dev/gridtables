@@ -206,4 +206,21 @@ gridTableTests = testGroup "parseGridTable"
              ]
     in parse' (gridTable *> newline *> many1 (letter <|> space)) gt @?=
        Right "Hi Mom"
+
+  , testGroup "access functions"
+    [ testCase "rows" $
+      let gt = GridTable
+               { gridTableArray = listArray ((1, 1), (2, 2))
+                 [ ContentCell 2 1 "1"
+                 , ContentCell 1 1 "2"
+                 , ContinuationCell (1, 1)
+                 , ContentCell 1 1 "3"
+                 ]
+               , gridTableHead = Nothing
+               , gridTableColWidths = [5, 7]
+               } :: GridTable Text
+      in rows gt @?= [ [Cell "1" 2 1, Cell "2" 1 1]
+                     , [Cell "3" 1 1]
+                     ]
+    ]
   ]
