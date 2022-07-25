@@ -14,6 +14,8 @@ Parse reStructuredText-style grid tables.
 
 module Text.GridTable
   ( GridTable (..)
+  , RowSpan (..)
+  , ColSpan (..)
   , RowIndex (..)
   , ColIndex (..)
   , GridCell (..)
