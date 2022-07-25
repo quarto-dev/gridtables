@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase                 #-}
+{-# LANGUAGE RankNTypes                 #-}
 {- |
 Module      : Text.GridTable
 Copyright   : © 2022 Albert Krewinkel
@@ -26,6 +27,7 @@ module Text.GridTable
   ) where
 
 import Prelude hiding (lines)
+import Control.Applicative ((<|>))
 import Control.Monad (forM_, void)
 import Control.Monad.ST
 import Data.Array
@@ -35,14 +37,15 @@ import Data.Function (on)
 import Data.Maybe (catMaybes)
 import Data.Set (Set)
 import Data.Text (Text)
-import Text.Parsec
+import Text.Parsec hiding ((<|>))
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
 
 -- | Grid table: Cells are placed on a grid.
-newtype GridTable = GridTable
+data GridTable = GridTable
   { gridTableArray :: Array CellIndex GridCell
+  , gridTableHead  :: Maybe RowIndex
   }
   deriving stock (Eq, Show)
 
@@ -90,6 +93,35 @@ scanCharGrid charGrid gridInfo =
                             Set.insert (bottom, left) corners
             , gridCells = cell `Set.insert` cells
             }
+
+-- | Finds the row indices of all separator lines, i.e., lines that
+-- contain only @+@ and @=@ characters.
+findSeparators :: CharGrid -> [CharRow]
+findSeparators charGrid = foldr go [] rows
+  where
+    gbounds = bounds charGrid
+    rows = [fst (fst gbounds) .. fst (snd gbounds)]
+    cols = [snd (fst gbounds) .. snd (snd gbounds)]
+    isSepChar = (Just True ==) . fmap (`elem` ("+=" :: String))
+    go i seps = if all isSepChar [ charGrid ! (i, j) | j <- cols ]
+                then i : seps
+                else seps
+
+-- | Returns new character grid in which the given lines have been
+-- converted to normal cell-separating lines.
+convertToNormalLines :: [CharRow] -> CharGrid -> CharGrid
+convertToNormalLines sepLines charGrid = runSTArray $ do
+  mutGrid <- thaw charGrid
+  let gbounds = bounds charGrid
+      cols = [snd (fst gbounds) .. snd (snd gbounds)]
+  forM_ sepLines $ \rowidx -> do
+    forM_ cols $ \colidx -> do
+      let idx = (rowidx, colidx)
+      c <- readArray mutGrid idx
+      case c of
+        Just '=' -> writeArray mutGrid idx (Just '-')
+        _        -> pure ()
+  return mutGrid
 
 type ScanResult = (CharIndex, Set CharRow, Set CharCol)
 
@@ -194,10 +226,12 @@ gridTable = do
   lines <- many1 tableLine
   skipMany space *> (eof <|> void newline) -- blank line
   let charGrid = toCharGrid lines
-  let gridInfo = scanCharGrid charGrid emptyGridInfo
+  let bodySeps = findSeparators charGrid
+  let charGrid' = convertToNormalLines bodySeps charGrid
+  let gridInfo = scanCharGrid charGrid' emptyGridInfo
   if Set.null (gridCells gridInfo)
     then fail "no cells"
-    else return $ tableFromScanningData gridInfo
+    else return $ tableFromScanningData gridInfo bodySeps
 
 type CharGrid = Array (CharRow, CharCol) (Maybe Char)
 
@@ -250,8 +284,8 @@ instance Ord CellTrace where
       o  -> o
 
 -- | Create a final grid table from line scanning data.
-tableFromScanningData :: GridInfo -> GridTable
-tableFromScanningData gridInfo =
+tableFromScanningData :: GridInfo -> [CharRow] -> GridTable
+tableFromScanningData gridInfo bodySeps =
   let cells   = gridCells gridInfo
       rowseps = Set.toAscList $ gridRowSeps gridInfo
       colseps = Set.toAscList $ gridColSeps gridInfo
@@ -294,7 +328,11 @@ tableFromScanningData gridInfo =
             FreeCell -> error $ "unassigned: " ++ show idx
             _ -> pure ())
         mapArray fromBuilderCell tblgrid
-  in GridTable $ runSTArray mutableTableGrid
+  in GridTable
+     { gridTableArray = runSTArray mutableTableGrid
+     , gridTableHead = (subtract 1) <$> foldr (<|>) Nothing
+                       (map (`Map.lookup` rowindex) bodySeps)
+     }
 
 continuationIndices :: (RowIndex, ColIndex)
                     -> RowSpan -> ColSpan

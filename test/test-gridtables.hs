@@ -56,8 +56,10 @@ gridTableTests = testGroup "parseGridTable"
                   , (RowIndex 1, ColIndex 1)
                   )
     in parse' gridTable gt @?=
-       Right (GridTable $ listArray gbounds
-              [ContentCell 1 1 [" one "]])
+       Right (GridTable
+              { gridTableArray = listArray gbounds [ContentCell 1 1 [" one "]]
+              , gridTableHead = Nothing
+              })
 
   , testCase "multi-cell row" $
     let gt = T.unlines
@@ -69,10 +71,13 @@ gridTableTests = testGroup "parseGridTable"
                   , (RowIndex 1, ColIndex 2)
                   )
     in parse' gridTable gt @?=
-       Right (GridTable $ listArray gbounds
-              [ ContentCell 1 1 [" one "]
-              , ContentCell 1 1 [" two "]
-              ])
+       Right (GridTable
+              { gridTableArray = listArray gbounds
+                                 [ ContentCell 1 1 [" one "]
+                                 , ContentCell 1 1 [" two "]
+                                 ]
+              , gridTableHead = Nothing
+              })
 
   , testCase "two-row table" $
     let gt = T.unlines
@@ -86,10 +91,13 @@ gridTableTests = testGroup "parseGridTable"
                   , (RowIndex 2, ColIndex 1)
                   )
     in parse' gridTable gt @?=
-       Right (GridTable $ listArray gbounds
-              [ ContentCell 1 1 [" one "]
-              , ContentCell 1 1 [" two "]
-              ])
+       Right (GridTable
+              { gridTableArray = listArray gbounds
+                                 [ ContentCell 1 1 [" one "]
+                                 , ContentCell 1 1 [" two "]
+                                 ]
+              , gridTableHead = Nothing
+              })
 
   , testCase "rowspan" $
     let gt = T.unlines
@@ -103,12 +111,39 @@ gridTableTests = testGroup "parseGridTable"
                   , (RowIndex 2, ColIndex 2)
                   )
     in parse' gridTable gt @?=
-       Right (GridTable $ listArray gbounds
-              [ ContentCell 2 1 [" one ", "     ", "     "]
-              , ContentCell 1 1 [" two   "]
-              , ContinuationCell (1, 1)
-              , ContentCell 1 1 [" three "]
-              ])
+       Right (GridTable
+              { gridTableArray = listArray gbounds
+                [ ContentCell 2 1 [" one ", "     ", "     "]
+                , ContentCell 1 1 [" two   "]
+                , ContinuationCell (1, 1)
+                , ContentCell 1 1 [" three "]
+                ]
+              , gridTableHead = Nothing
+              })
+
+  , testGroup "table head"
+    [ testCase "rowspan" $
+      let gt = T.unlines
+               [ "+-----+-----+"
+               , "| one | two |"
+               , "+=====+=====+"
+               , "|  1  |  2  |"
+               , "+-----+-----+"
+               ]
+          gbounds = ( (RowIndex 1, ColIndex 1)
+                    , (RowIndex 2, ColIndex 2)
+                    )
+      in parse' gridTable gt @?=
+         Right (GridTable
+                { gridTableArray = listArray gbounds
+                  [ ContentCell 1 1 [" one "]
+                  , ContentCell 1 1 [" two "]
+                  , ContentCell 1 1 ["  1  "]
+                  , ContentCell 1 1 ["  2  "]
+                  ]
+                , gridTableHead = Just 1
+                })
+    ]
 
   , testCase "unterminated row" $
     let gt = T.unlines
@@ -120,9 +155,11 @@ gridTableTests = testGroup "parseGridTable"
                   , (RowIndex 1, ColIndex 1)
                   )
     in parse' gridTable gt @?=
-       Right (GridTable $ listArray gbounds
-              [ ContentCell 1 1 [" one"]
-              ])
+       Right (GridTable
+              { gridTableArray = listArray gbounds
+                                 [ ContentCell 1 1 [" one"]]
+              , gridTableHead = Nothing
+              })
 
   , testCase "followed by non-empty line" $
     let gt = T.unlines
