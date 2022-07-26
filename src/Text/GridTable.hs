@@ -135,13 +135,13 @@ scanCharGrid charGrid gridInfo =
 -- | Finds the row indices of all separator lines, i.e., lines that
 -- contain only @+@ and @=@ characters.
 findSeparators :: CharGrid -> [CharRow]
-findSeparators charGrid = foldr go [] rows
+findSeparators charGrid = foldr go [] rowIdxs
   where
     gbounds = bounds charGrid
-    rows = [fst (fst gbounds) .. fst (snd gbounds)]
-    cols = [snd (fst gbounds) .. snd (snd gbounds)]
+    rowIdxs = [fst (fst gbounds) .. fst (snd gbounds)]
+    colIdxs = [snd (fst gbounds) .. snd (snd gbounds)]
     isSepChar = (Just True ==) . fmap (`elem` ("+=" :: String))
-    go i seps = if all isSepChar [ charGrid ! (i, j) | j <- cols ]
+    go i seps = if all isSepChar [ charGrid ! (i, j) | j <- colIdxs ]
                 then i : seps
                 else seps
 
@@ -248,10 +248,10 @@ scanUp charGrid (top, left) (bottom, _right) =
 -- | Get lines of a cell
 getLines :: CharGrid -> CharIndex -> CharIndex -> [Text]
 getLines charGrid (top, left) (bottom, right) =
-  let rows = [top + 1 .. bottom - 1]
-      columns = [left + 1 .. right - 1]
-  in map (\ir -> T.pack $ mapMaybe (\ic -> charGrid ! (ir, ic)) columns)
-         rows
+  let rowIdxs = [top + 1 .. bottom - 1]
+      colIdxs = [left + 1 .. right - 1]
+  in map (\ir -> T.pack $ mapMaybe (\ic -> charGrid ! (ir, ic)) colIdxs)
+         rowIdxs
 
 -- | Parser type
 type GridTableParser m a = ParsecT Text GridInfo m a
