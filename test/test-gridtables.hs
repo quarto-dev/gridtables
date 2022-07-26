@@ -25,8 +25,8 @@ main = defaultMain $ testGroup "gridtables"
     , gridTableTests
     ]
 
-parse' :: GridTableParser Identity a -> Text -> Either ParseError a
-parse' p t = runParser p emptyGridInfo "<test input>" t
+parse' :: ParsecT Text () Identity a -> Text -> Either ParseError a
+parse' p t = runParser p () "<test input>" t
 
 -- | Test parsing into lines
 linesTests :: TestTree

@@ -21,7 +21,6 @@ module Text.GridTable
   , GridCell (..)
   , Cell (..)
   , gridTable
-  , GridTableParser
   , GridInfo (..)
   , emptyGridInfo
   , tableLine
@@ -252,9 +251,6 @@ getLines charGrid (top, left) (bottom, right) =
       colIdxs = [left + 1 .. right - 1]
   in map (\ir -> T.pack $ mapMaybe (\ic -> charGrid ! (ir, ic)) colIdxs)
          rowIdxs
-
--- | Parser type
-type GridTableParser m a = ParsecT Text GridInfo m a
 
 -- | Parses a grid table.
 gridTable :: Stream s m Char => ParsecT s u m (GridTable [Text])
