@@ -13,18 +13,12 @@ Parse reStructuredText-style grid tables.
 -}
 
 module Text.GridTable
-  ( GridTable (..)
-  , RowSpan (..)
-  , ColSpan (..)
-  , RowIndex (..)
-  , ColIndex (..)
-  , GridCell (..)
+  ( module Text.GridTable.ArrayTable
   , Cell (..)
   , gridTable
   , GridInfo (..)
   , emptyGridInfo
   , tableLine
-  , mapCells
   , rows
   ) where
 
@@ -41,29 +35,11 @@ import Data.Maybe (mapMaybe)
 import Data.Set (Set)
 import Data.Text (Text)
 import Text.DocLayout (charWidth)
+import Text.GridTable.ArrayTable
 import Text.Parsec hiding ((<|>))
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
-
--- | Grid table: Cells are placed on a grid.
-data GridTable a = GridTable
-  { gridTableArray :: Array CellIndex (GridCell a)
-  , gridTableHead  :: Maybe RowIndex
-  , gridTableColWidths :: [Int]
-  }
-  deriving stock (Eq, Show)
-
--- | Apply a function to all cell contents in a grid table.
-mapCells :: (a -> b) -> GridTable a -> GridTable b
-mapCells f gt =
-  let f' = \case
-        ContentCell rs cs c  -> ContentCell rs cs $ f c
-        ContinuationCell idx -> ContinuationCell idx
-      cellArray = runSTArray $ do
-        mut <- thaw $ gridTableArray gt
-        mapArray f' mut
-  in gt { gridTableArray = cellArray }
 
 colBounds :: Array CellIndex a -> (ColIndex, ColIndex)
 colBounds = bimap snd snd . bounds
@@ -383,37 +359,6 @@ continuationIndices (RowIndex ridx, ColIndex cidx) rowspan colspan =
                                 , c <- [cidx..(cidx + cs - 1)]
                                 , (r, c) /= (ridx, cidx)]
 
--- | Row index in a table array.
-newtype RowIndex = RowIndex { fromRowIndex :: Int }
-  deriving stock (Eq, Ix, Ord)
-  deriving newtype (Enum, Num, Show)
-
--- | Column index in a table array.
-newtype ColIndex = ColIndex { fromColIndex :: Int }
-  deriving stock (Eq, Ix, Ord)
-  deriving newtype (Enum, Num, Show)
-
--- | Index to a cell in a table part.
-type CellIndex = (RowIndex, ColIndex)
-
--- | A grid cell contains either a real table cell, or is the
--- continuation of a column or row-spanning cell. In the latter case,
--- the index of the continued cell is provided.
-data GridCell a
-  = ContentCell RowSpan ColSpan a
-  | ContinuationCell CellIndex
-  deriving stock (Eq, Show)
-
 data BuilderCell
   = FilledCell (GridCell [Text])
   | FreeCell
-
--- | The number of rows spanned by a cell.
-newtype RowSpan = RowSpan Int
-  deriving stock (Eq, Ord)
-  deriving newtype (Enum, Num, Read, Show)
-
--- | The number of columns spanned by a cell.
-newtype ColSpan = ColSpan Int
-  deriving stock (Eq, Ord)
-  deriving newtype (Enum, Num, Read, Show)
