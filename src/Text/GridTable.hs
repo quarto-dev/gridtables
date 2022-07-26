@@ -259,7 +259,7 @@ type GridTableParser m a = ParsecT Text GridInfo m a
 -- | Parses a grid table.
 gridTable :: Stream s m Char => ParsecT s u m (GridTable [Text])
 gridTable = try $ do
-  firstLine <- manyTill (oneOf "+-") newline
+  firstLine <- many1 (oneOf "+-") <* skipSpaces <* newline
   lines <- many1 tableLine
   let charGrid = toCharGrid (T.pack firstLine : lines)
   let bodySeps = findSeparators charGrid
@@ -268,6 +268,9 @@ gridTable = try $ do
   if Set.null (gridCells gridInfo)
     then fail "no cells"
     else return $ tableFromScanningData gridInfo bodySeps
+
+skipSpaces :: Stream s m Char => ParsecT s u m ()
+skipSpaces = skipMany (satisfy $ \c -> c == '\t' || c == ' ')
 
 type CharGrid = Array (CharRow, CharCol) (Maybe Char)
 
@@ -295,7 +298,7 @@ tableLine = try $ do
   let borderChar = char '+' <|> char '|'
   firstChar <- borderChar
   rest <- manyTill (noneOf "\n\r") newline
-  return $ T.pack (firstChar : rest)
+  return $ T.stripEnd $ T.pack (firstChar : rest)
 
 -- | Character row
 newtype CharRow = CharRow Int

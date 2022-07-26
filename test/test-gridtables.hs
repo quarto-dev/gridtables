@@ -183,7 +183,21 @@ gridTableTests = testGroup "parseGridTable"
               { gridTableArray = listArray gbounds
                                  [ ContentCell 1 1 [" one"]]
               , gridTableHead = Nothing
-                , gridTableColWidths = [5]
+              , gridTableColWidths = [5]
+              })
+
+  , testCase "trailing spaces" $
+    let ls = T.unlines
+             [ "+---+  "
+             , "| 1 | "
+             , "+---+"
+             ]
+    in parse' gridTable ls @?=
+       Right (GridTable
+              { gridTableArray = listArray ((1,1), (1,1))
+                                 [ ContentCell 1 1 [" 1 "]]
+              , gridTableHead = Nothing
+              , gridTableColWidths = [3]
               })
 
   , testCase "followed by non-empty line" $
