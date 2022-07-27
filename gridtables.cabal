@@ -57,6 +57,7 @@ library
                      , doclayout
   exposed-modules:     Text.GridTable
                      , Text.GridTable.ArrayTable
+                     , Text.GridTable.Parse
                      , Text.GridTable.Trace
   other-extensions:    DeriveFunctor
                      , DerivingStrategies

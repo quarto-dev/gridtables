@@ -13,6 +13,7 @@ import Data.Array (listArray)
 import Data.Functor.Identity (Identity)
 import Data.Text (Text)
 import Text.GridTable
+import Text.GridTable.Parse (tableLine)
 import Text.Parsec
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.HUnit ((@?=), testCase)
