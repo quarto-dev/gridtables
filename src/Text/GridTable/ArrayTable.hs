@@ -18,6 +18,7 @@ module Text.GridTable.ArrayTable
   , CellIndex
   , RowIndex (..)
   , ColIndex (..)
+  , Alignment (..)
   , mapCells
   ) where
 
@@ -29,7 +30,7 @@ import Data.Array.ST (runSTArray)
 data GridTable a = GridTable
   { gridTableArray :: Array CellIndex (GridCell a)
   , gridTableHead  :: Maybe RowIndex
-  , gridTableColWidths :: [Int]
+  , gridTableColSpecs :: [(Int, Alignment)]
   }
   deriving stock (Eq, Show)
 
@@ -74,3 +75,11 @@ newtype RowSpan = RowSpan Int
 newtype ColSpan = ColSpan Int
   deriving stock (Eq, Ord)
   deriving newtype (Enum, Num, Read, Show)
+
+-- | Cell alignment
+data Alignment
+  = AlignDefault
+  | AlignLeft
+  | AlignCenter
+  | AlignRight
+  deriving stock (Enum, Eq, Ord, Read, Show)

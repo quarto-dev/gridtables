@@ -26,7 +26,7 @@ import Data.Array
 import Data.Array.MArray
 import Data.Array.ST
 import Data.Function (on)
-import Data.Maybe (mapMaybe)
+import Data.Maybe (listToMaybe, mapMaybe)
 import Data.Set (Set)
 import Data.Text (Text)
 import Text.DocLayout (charWidth)
@@ -40,12 +40,12 @@ import qualified Data.Text as T
 traceLines :: [Text] -> Maybe (GridTable [Text])
 traceLines lines =
   let charGrid = toCharGrid lines
-      bodySeps = findSeparators charGrid
-      charGrid' = convertToNormalLines bodySeps charGrid
+      partSeps = findSeparators charGrid
+      charGrid' = convertToNormalLines (map partSepLine partSeps) charGrid
       traceInfo = traceCharGrid charGrid' initialTraceInfo
   in if Set.null (gridCells traceInfo)
      then fail "no cells"
-     else return $ tableFromTraceInfo traceInfo bodySeps
+     else return $ tableFromTraceInfo traceInfo partSeps
 
 -- | Type used to represent the 2D layout of table characters
 type CharGrid = Array (CharRow, CharCol) (Maybe Char)
@@ -79,18 +79,67 @@ toCharGrid lines =
                           lines
   in listArray gbounds (mconcat extendedLines)
 
+data PartSeparator = PartSeparator
+  { partSepLine    :: CharRow
+  , partSepColSpec :: [ColSpec]
+  }
+
+data ColSpec = ColSpec
+  { colStart :: CharCol
+  , colEnd   :: CharCol
+  , colAlign :: Alignment
+  }
+
 -- | Finds the row indices of all separator lines, i.e., lines that
 -- contain only @+@ and @=@ characters.
-findSeparators :: CharGrid -> [CharRow]
+findSeparators :: CharGrid -> [PartSeparator]
 findSeparators charGrid = foldr go [] rowIdxs
   where
     gbounds = bounds charGrid
     rowIdxs = [fst (fst gbounds) .. fst (snd gbounds)]
-    colIdxs = [snd (fst gbounds) .. snd (snd gbounds)]
-    isSepChar = (Just True ==) . fmap (`elem` ("+=" :: String))
-    go i seps = if all isSepChar [ charGrid ! (i, j) | j <- colIdxs ]
-                then i : seps
-                else seps
+    go i seps = case colSpecsInLine charGrid i of
+                  Nothing -> seps
+                  Just colspecs -> PartSeparator i colspecs : seps
+
+colSpecsInLine :: CharGrid -> CharRow -> Maybe [ColSpec]
+colSpecsInLine charGrid i =
+  case charGrid ! (i, firstCol) of
+    Just '+' -> loop [] (firstCol + 1)
+    _        -> Nothing
+  where
+    loop acc j = case colSpecAt j of
+                   Nothing      -> Nothing
+                   Just Nothing -> Just $ reverse acc
+                   Just (Just colspec) ->
+                     loop (colspec:acc) (colEnd colspec + 1)
+    gbounds = bounds charGrid
+    firstCol = snd (fst gbounds)
+    lastCol = snd (snd gbounds)
+    colSpecAt :: CharCol -> Maybe (Maybe ColSpec)
+    colSpecAt j
+      | j >= lastCol = Just Nothing
+      | otherwise = case findEnd (j + 1) of
+          Nothing               -> Nothing
+          Just (end, rightMark) ->
+            let leftMark = charGrid ! (i, j) == Just ':'
+                align = case (leftMark, rightMark) of
+                  (False , False) -> AlignDefault
+                  (True  , False) -> AlignLeft
+                  (False , True ) -> AlignRight
+                  (True  , True ) -> AlignCenter
+                colspec = ColSpec
+                  { colStart = j
+                  , colEnd = end
+                  , colAlign = align
+                  }
+            in pure (pure colspec)
+    findEnd j = case charGrid ! (i, j) of
+      Just '+' -> pure (j, False)
+      Just ':' -> if charGrid ! (i, j + 1) == Just '+'
+                  then pure (j + 1, True)
+                  else Nothing
+      Just '=' -> findEnd (j + 1)
+      _        -> Nothing
 
 -- | Returns new character grid in which the given lines have been
 -- converted to normal cell-separating lines.
@@ -103,8 +152,10 @@ convertToNormalLines sepLines charGrid = runSTArray $ do
     forM_ cols $ \colidx -> do
       let idx = (rowidx, colidx)
       c <- readArray mutGrid idx
+      -- convert `=` to `-` and remove alignment markers
       case c of
         Just '=' -> writeArray mutGrid idx (Just '-')
+        Just ':' -> writeArray mutGrid idx (Just '-')
         _        -> pure ()
   return mutGrid
 
@@ -261,8 +312,8 @@ instance Ord CellTrace where
       o  -> o
 
 -- | Create a final grid table from line scanning data.
-tableFromTraceInfo :: TraceInfo -> [CharRow] -> GridTable [Text]
-tableFromTraceInfo traceInfo bodySeps =
+tableFromTraceInfo :: TraceInfo -> [PartSeparator] -> GridTable [Text]
+tableFromTraceInfo traceInfo partSeps =
   let rowseps = Set.toAscList $ gridRowSeps traceInfo
       colseps = Set.toAscList $ gridColSeps traceInfo
       rowindex = Map.fromList $ zip rowseps [1..]
@@ -308,8 +359,13 @@ tableFromTraceInfo traceInfo bodySeps =
   in GridTable
      { gridTableArray = runSTArray mutableTableGrid
      , gridTableHead = subtract 1 <$>
-                       foldr ((<|>) . (`Map.lookup` rowindex)) Nothing bodySeps
-     , gridTableColWidths = map fromCharCol colwidths
+                       foldr ((<|>) . (`Map.lookup` rowindex) . partSepLine)
+                             Nothing
+                             partSeps
+     , gridTableColSpecs = zip (map fromCharCol colwidths)
+                               (maybe [] (map colAlign . partSepColSpec)
+                                      (listToMaybe partSeps)
+                                ++ repeat AlignDefault)
      }
 
 continuationIndices :: (RowIndex, ColIndex)
