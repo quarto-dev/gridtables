@@ -26,7 +26,7 @@ import Data.Array
 import Data.Array.MArray
 import Data.Array.ST
 import Data.Function (on)
-import Data.Maybe (listToMaybe, mapMaybe)
+import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Set (Set)
 import Data.Text (Text)
 import Text.DocLayout (charWidth)
@@ -40,12 +40,13 @@ import qualified Data.Text as T
 traceLines :: [Text] -> Maybe (GridTable [Text])
 traceLines lines =
   let charGrid = toCharGrid lines
+      specs1   = colSpecsInLine '-' charGrid 1
       partSeps = findSeparators charGrid
-      charGrid' = convertToNormalLines (map partSepLine partSeps) charGrid
+      charGrid' = convertToNormalLines (1:map partSepLine partSeps) charGrid
       traceInfo = traceCharGrid charGrid' initialTraceInfo
   in if Set.null (gridCells traceInfo)
      then fail "no cells"
-     else return $ tableFromTraceInfo traceInfo partSeps
+     else return $ tableFromTraceInfo traceInfo partSeps specs1
 
 -- | Type used to represent the 2D layout of table characters
 type CharGrid = Array (CharRow, CharCol) (Maybe Char)
@@ -97,12 +98,12 @@ findSeparators charGrid = foldr go [] rowIdxs
   where
     gbounds = bounds charGrid
     rowIdxs = [fst (fst gbounds) .. fst (snd gbounds)]
-    go i seps = case colSpecsInLine charGrid i of
+    go i seps = case colSpecsInLine '=' charGrid i of
                   Nothing -> seps
                   Just colspecs -> PartSeparator i colspecs : seps
 
-colSpecsInLine :: CharGrid -> CharRow -> Maybe [ColSpec]
-colSpecsInLine charGrid i =
+colSpecsInLine :: Char -> CharGrid -> CharRow -> Maybe [ColSpec]
+colSpecsInLine c charGrid i =
   case charGrid ! (i, firstCol) of
     Just '+' -> loop [] (firstCol + 1)
     _        -> Nothing
@@ -138,8 +139,9 @@ colSpecsInLine charGrid i =
       Just ':' -> if charGrid ! (i, j + 1) == Just '+'
                   then pure (j + 1, True)
                   else Nothing
-      Just '=' -> findEnd (j + 1)
-      _        -> Nothing
+      Just c'
+        | c' == c -> findEnd (j + 1)
+      _           -> Nothing
 
 -- | Returns new character grid in which the given lines have been
 -- converted to normal cell-separating lines.
@@ -312,61 +314,72 @@ instance Ord CellTrace where
       o  -> o
 
 -- | Create a final grid table from line scanning data.
-tableFromTraceInfo :: TraceInfo -> [PartSeparator] -> GridTable [Text]
-tableFromTraceInfo traceInfo partSeps =
+tableFromTraceInfo :: TraceInfo
+                   -> [PartSeparator]
+                   -> Maybe [ColSpec]
+                   -> GridTable [Text]
+tableFromTraceInfo traceInfo partSeps colSpecsFirstLine =
   let rowseps = Set.toAscList $ gridRowSeps traceInfo
       colseps = Set.toAscList $ gridColSeps traceInfo
       rowindex = Map.fromList $ zip rowseps [1..]
       colindex = Map.fromList $ zip colseps [1..]
-      nrows = Map.size rowindex - 1
-      ncols = Map.size colindex - 1
-      gbounds = ( (RowIndex 1, ColIndex 1)
+      colwidths = [ b - a - 1 | (b, a) <- zip (tail colseps) colseps ]
+      colSpecs = zip (map fromCharCol colwidths)
+                     (map colAlign
+                          (case partSeps of
+                             partSep:_ -> partSepColSpec partSep
+                             []        -> fromMaybe [] colSpecsFirstLine)
+                      ++ repeat AlignDefault)
+      tableHead = subtract 1 <$>
+                  foldr ((<|>) . (`Map.lookup` rowindex) . partSepLine)
+                        Nothing
+                        partSeps
+  in GridTable
+     { gridTableArray = runSTArray (toMutableArray traceInfo rowindex colindex)
+     , gridTableHead = tableHead
+     , gridTableColSpecs = colSpecs
+     }
+
+toMutableArray :: TraceInfo
+               -> Map.Map CharRow RowIndex
+               -> Map.Map CharCol ColIndex
+               -> ST s (STArray s CellIndex (GridCell [Text]))
+toMutableArray traceInfo rowindex colindex = do
+  let nrows = Map.size rowindex - 1
+  let ncols = Map.size colindex - 1
+  let gbounds = ( (RowIndex 1, ColIndex 1)
                 , (RowIndex nrows, ColIndex ncols)
                 )
-      colwidths = [ b - a - 1 | (b, a) <- zip (tail colseps) colseps ]
-      mutableTableGrid :: ST s (STArray s CellIndex (GridCell [Text]))
-      mutableTableGrid = do
-        tblgrid <- newArray gbounds FreeCell
-        forM_ (Set.toAscList $ gridCells traceInfo) $
-          \(CellTrace content left right top bottom) -> do
-            let cellPos = do
-                  rnum <- Map.lookup top rowindex
-                  cnum <- Map.lookup left colindex
-                  rs   <- RowSpan . fromRowIndex . subtract rnum <$>
-                          Map.lookup bottom rowindex
-                  cs   <- ColSpan . fromColIndex . subtract cnum <$>
-                          Map.lookup right colindex
-                  pure ((rnum, cnum), rs, cs)
-            let (idx, rowspan, colspan) = case cellPos of
-                  Just cp -> cp
-                  Nothing -> error "A cell or row index was not found"
-            writeArray tblgrid idx . FilledCell $
-              ContentCell rowspan colspan content
-            forM_ (continuationIndices idx rowspan colspan) $ \contIdx -> do
-              -- FIXME: ensure that the cell has not been filled yet
-              writeArray tblgrid contIdx $
-                FilledCell (ContinuationCell idx)
-            -- Swap BuilderCells with normal GridCells.
-        let fromBuilderCell :: BuilderCell -> GridCell [Text]
-            fromBuilderCell = \case
-              FilledCell c -> c
-              FreeCell     -> error "Found an unassigned cell."
-        getAssocs tblgrid >>= (\kvs -> forM_ kvs $ \(idx, bc) ->
-          case bc of
-            FreeCell -> error $ "unassigned: " ++ show idx
-            _ -> pure ())
-        mapArray fromBuilderCell tblgrid
-  in GridTable
-     { gridTableArray = runSTArray mutableTableGrid
-     , gridTableHead = subtract 1 <$>
-                       foldr ((<|>) . (`Map.lookup` rowindex) . partSepLine)
-                             Nothing
-                             partSeps
-     , gridTableColSpecs = zip (map fromCharCol colwidths)
-                               (maybe [] (map colAlign . partSepColSpec)
-                                      (listToMaybe partSeps)
-                                ++ repeat AlignDefault)
-     }
+  tblgrid <- newArray gbounds FreeCell
+  forM_ (Set.toAscList $ gridCells traceInfo) $
+    \(CellTrace content left right top bottom) -> do
+      let cellPos = do
+            rnum <- Map.lookup top rowindex
+            cnum <- Map.lookup left colindex
+            rs   <- RowSpan . fromRowIndex . subtract rnum <$>
+                    Map.lookup bottom rowindex
+            cs   <- ColSpan . fromColIndex . subtract cnum <$>
+                    Map.lookup right colindex
+            pure ((rnum, cnum), rs, cs)
+      let (idx, rowspan, colspan) = case cellPos of
+            Just cp -> cp
+            Nothing -> error "A cell or row index was not found"
+      writeArray tblgrid idx . FilledCell $
+        ContentCell rowspan colspan content
+      forM_ (continuationIndices idx rowspan colspan) $ \contIdx -> do
+        -- FIXME: ensure that the cell has not been filled yet
+        writeArray tblgrid contIdx $
+          FilledCell (ContinuationCell idx)
+      -- Swap BuilderCells with normal GridCells.
+  let fromBuilderCell :: BuilderCell -> GridCell [Text]
+      fromBuilderCell = \case
+        FilledCell c -> c
+        FreeCell     -> error "Found an unassigned cell."
+  getAssocs tblgrid >>= (\kvs -> forM_ kvs $ \(idx, bc) ->
+    case bc of
+      FreeCell -> error $ "unassigned: " ++ show idx
+      _ -> pure ())
+  mapArray fromBuilderCell tblgrid
 
 continuationIndices :: (RowIndex, ColIndex)
                     -> RowSpan -> ColSpan

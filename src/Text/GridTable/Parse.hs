@@ -25,7 +25,10 @@ import qualified Data.Text as T
 -- | Parses a grid table.
 gridTable :: Stream s m Char => ParsecT s u m (GridTable [Text])
 gridTable = try $ do
-  firstLine <- (:) <$> char '+' <*> many1 (oneOf "+-") <* skipSpaces <* newline
+  firstLine <- (:) <$> char '+'
+                   <*> (mconcat <$> many1 (gridPart '-'))
+                   <* skipSpaces
+                   <* newline
   lines <- many1 tableLine
   case traceLines (T.pack firstLine : lines) of
     Nothing -> fail "tracing failed"
@@ -43,3 +46,12 @@ tableLine = try $ do
   firstChar <- borderChar
   rest <- manyTill (noneOf "\n\r") newline
   return $ T.stripEnd $ T.pack (firstChar : rest)
+
+gridPart :: Stream s m Char
+         => Char -> ParsecT s u m String
+gridPart ch = do
+  leftColon <- option id ((:) <$> char ':')
+  dashes <- many1 (char ch)
+  rightColon <- option id ((:) <$> char ':')
+  plus <- char '+'
+  return . leftColon . (dashes ++) . rightColon $ [plus]

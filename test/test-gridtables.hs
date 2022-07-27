@@ -195,6 +195,30 @@ gridTableTests = testGroup "parseGridTable"
                 })
     ]
 
+  , testCase "marker in first line" $
+    let gt = T.unlines
+             [ "+:-----+:------:+------:+"
+             , "| left | center | right |"
+             , "+------+--------+-------+"
+             , "| a 1  | b 2    | c 3   |"
+             , "+------+--------+-------+"
+             ]
+    in parse' gridTable gt @?=
+       Right (GridTable
+              { gridTableArray = listArray ((1,1), (2, 3))
+                [ ContentCell 1 1 [" left "]
+                , ContentCell 1 1 [" center "]
+                , ContentCell 1 1 [" right "]
+                , ContentCell 1 1 [" a 1  "]
+                , ContentCell 1 1 [" b 2    "]
+                , ContentCell 1 1 [" c 3   "]
+                ]
+              , gridTableHead = Nothing
+              , gridTableColSpecs = [ (6, AlignLeft)
+                                    , (8, AlignCenter)
+                                    , (7, AlignRight)
+                                    ]
+              })
 
   , testCase "unterminated row" $
     let gt = T.unlines
