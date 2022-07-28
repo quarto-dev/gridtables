@@ -189,9 +189,9 @@ gridTableTests = testGroup "parseArrayTable"
                   ]
                 , arrayTableHead = Just 1
                 , arrayTableColSpecs = listArray (1, 3)
-                                       [ (6, AlignLeft)
-                                       , (8, AlignCenter)
-                                       , (7, AlignRight)
+                                       [ (AlignLeft, 6)
+                                       , (AlignCenter, 8)
+                                       , (AlignRight, 7)
                                        ]
                 })
     ]
@@ -216,9 +216,9 @@ gridTableTests = testGroup "parseArrayTable"
                 ]
               , arrayTableHead = Nothing
               , arrayTableColSpecs = listArray (1, 3)
-                                     [ (6, AlignLeft)
-                                     , (8, AlignCenter)
-                                     , (7, AlignRight)
+                                     [ (AlignLeft, 6)
+                                     , (AlignCenter, 8)
+                                     , (AlignRight, 7)
                                      ]
               })
 
@@ -292,6 +292,6 @@ gridTableTests = testGroup "parseArrayTable"
     ]
   ]
 
-defaultAlign :: [Int] -> Array ColIndex (Int, Alignment)
+defaultAlign :: [Int] -> Array ColIndex (Alignment, Int)
 defaultAlign widths = listArray (1, ColIndex (length widths))
-                    $ map (\w -> (w, AlignDefault)) widths
+                    $ map (\w -> (AlignDefault, w)) widths

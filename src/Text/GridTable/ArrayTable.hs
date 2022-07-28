@@ -32,7 +32,7 @@ import Data.Array.ST (runSTArray)
 data ArrayTable a = ArrayTable
   { arrayTableCells    :: Array CellIndex (GridCell a)
   , arrayTableHead     :: Maybe RowIndex
-  , arrayTableColSpecs :: Array ColIndex (Int, Alignment)
+  , arrayTableColSpecs :: Array ColIndex (Alignment, Int)
   }
   deriving stock (Eq, Show)
 

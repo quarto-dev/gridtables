@@ -349,12 +349,13 @@ tableFromTraceInfo traceInfo partSeps colSpecsFirstLine =
       rowindex = Map.fromList $ zip rowseps [1..]
       colindex = Map.fromList $ zip colseps [1..]
       colwidths = [ b - a - 1 | (b, a) <- zip (tail colseps) colseps ]
-      colSpecs = zip (map fromCharCol colwidths)
-                     (map colAlign
-                          (case partSeps of
-                             partSep:_ -> partSepColSpec partSep
-                             []        -> fromMaybe [] colSpecsFirstLine)
-                      ++ repeat AlignDefault)
+      colSpecs = zip
+                 (map colAlign
+                   (case partSeps of
+                       partSep:_ -> partSepColSpec partSep
+                       []        -> fromMaybe [] colSpecsFirstLine)
+                   ++ repeat AlignDefault)
+                 (map fromCharCol colwidths)
       lastCol = ColIndex (length colwidths)
       tableHead = subtract 1 <$>
                   foldr ((<|>) . (`Map.lookup` rowindex) . partSepLine)
