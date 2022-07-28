@@ -355,6 +355,7 @@ tableFromTraceInfo traceInfo partSeps colSpecsFirstLine =
                              partSep:_ -> partSepColSpec partSep
                              []        -> fromMaybe [] colSpecsFirstLine)
                       ++ repeat AlignDefault)
+      lastCol = ColIndex (length colwidths)
       tableHead = subtract 1 <$>
                   foldr ((<|>) . (`Map.lookup` rowindex) . partSepLine)
                         Nothing
@@ -362,7 +363,7 @@ tableFromTraceInfo traceInfo partSeps colSpecsFirstLine =
   in ArrayTable
      { arrayTableCells = runSTArray (toMutableArray traceInfo rowindex colindex)
      , arrayTableHead = tableHead
-     , arrayTableColSpecs = colSpecs
+     , arrayTableColSpecs = listArray (1, lastCol) colSpecs
      }
 
 -- | Create a mutable cell array from the scanning data.

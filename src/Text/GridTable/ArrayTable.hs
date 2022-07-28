@@ -30,9 +30,9 @@ import Data.Array.ST (runSTArray)
 -- with indices spanned by other cells containing placeholder cells that
 -- point to the spanning cell.
 data ArrayTable a = ArrayTable
-  { arrayTableCells   :: Array CellIndex (GridCell a)
+  { arrayTableCells    :: Array CellIndex (GridCell a)
   , arrayTableHead     :: Maybe RowIndex
-  , arrayTableColSpecs :: [(Int, Alignment)]
+  , arrayTableColSpecs :: Array ColIndex (Int, Alignment)
   }
   deriving stock (Eq, Show)
 

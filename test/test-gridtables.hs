@@ -9,7 +9,7 @@ Tests for the gridtables library.
 -}
 module Main (main) where
 
-import Data.Array (listArray)
+import Data.Array (Array, listArray)
 import Data.Functor.Identity (Identity)
 import Data.Text (Text)
 import Text.GridTable
@@ -188,10 +188,11 @@ gridTableTests = testGroup "parseArrayTable"
                   , ContentCell 1 1 [" 3     "]
                   ]
                 , arrayTableHead = Just 1
-                , arrayTableColSpecs = [ (6, AlignLeft)
-                                      , (8, AlignCenter)
-                                      , (7, AlignRight)
-                                      ]
+                , arrayTableColSpecs = listArray (1, 3)
+                                       [ (6, AlignLeft)
+                                       , (8, AlignCenter)
+                                       , (7, AlignRight)
+                                       ]
                 })
     ]
 
@@ -214,10 +215,11 @@ gridTableTests = testGroup "parseArrayTable"
                 , ContentCell 1 1 [" c 3   "]
                 ]
               , arrayTableHead = Nothing
-              , arrayTableColSpecs = [ (6, AlignLeft)
-                                    , (8, AlignCenter)
-                                    , (7, AlignRight)
-                                    ]
+              , arrayTableColSpecs = listArray (1, 3)
+                                     [ (6, AlignLeft)
+                                     , (8, AlignCenter)
+                                     , (7, AlignRight)
+                                     ]
               })
 
   , testCase "unterminated row" $
@@ -290,5 +292,6 @@ gridTableTests = testGroup "parseArrayTable"
     ]
   ]
 
-defaultAlign :: [Int] -> [(Int, Alignment)]
-defaultAlign = map (\w -> (w, AlignDefault))
+defaultAlign :: [Int] -> Array ColIndex (Int, Alignment)
+defaultAlign widths = listArray (1, ColIndex (length widths))
+                    $ map (\w -> (w, AlignDefault)) widths
