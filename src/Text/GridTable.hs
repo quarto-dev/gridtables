@@ -30,6 +30,7 @@ import Text.GridTable.Parse (gridTable)
 colBounds :: Array CellIndex a -> (ColIndex, ColIndex)
 colBounds = bimap snd snd . bounds
 
+-- | Returns the rows of a grid table as lists of simple cells.
 rows :: GridTable a -> [[Cell a]]
 rows gt =
   let tarr = gridTableArray gt

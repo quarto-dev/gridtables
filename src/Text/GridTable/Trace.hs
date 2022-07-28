@@ -80,11 +80,14 @@ toCharGrid lines =
                           lines
   in listArray gbounds (mconcat extendedLines)
 
+-- | Information on, and extracted from, a body separator line. This is a line
+-- that uses @=@ instead of @-@ to demark cell borders.
 data PartSeparator = PartSeparator
   { partSepLine    :: CharRow
   , partSepColSpec :: [ColSpec]
   }
 
+-- | Alignment and character grid position of a column.
 data ColSpec = ColSpec
   { colStart :: CharCol
   , colEnd   :: CharCol
@@ -102,7 +105,10 @@ findSeparators charGrid = foldr go [] rowIdxs
                   Nothing -> seps
                   Just colspecs -> PartSeparator i colspecs : seps
 
-colSpecsInLine :: Char -> CharGrid -> CharRow -> Maybe [ColSpec]
+-- | Checks for a separator in the given line, returning the column properties
+-- if it finds such a line.
+colSpecsInLine :: Char  -- ^ Character used in line (usually @-@)
+               -> CharGrid -> CharRow -> Maybe [ColSpec]
 colSpecsInLine c charGrid i =
   case charGrid ! (i, firstCol) of
     Just '+' -> loop [] (firstCol + 1)
@@ -181,7 +187,11 @@ initialTraceInfo = TraceInfo
   , gridCells   = Set.fromList []
   }
 
-traceCharGrid :: CharGrid -> TraceInfo -> TraceInfo
+-- | Trace the given char grid and collect all relevant info.
+-- This function calls itself recursively.
+traceCharGrid :: CharGrid
+              -> TraceInfo
+              -> TraceInfo
 traceCharGrid charGrid traceInfo =
   -- Get the next corner an remove it from the set of unparsed corners.
   case Set.minView (gridCorners traceInfo) of
@@ -211,9 +221,17 @@ type ScanResult = (CharIndex, Set CharRow, Set CharCol)
 type RowSeps = Set CharRow
 type ColSeps = Set CharCol
 
+-- | Traces a single cell on the grid, starting at the given position.
 traceCell :: CharGrid -> CharIndex -> Maybe ScanResult
 traceCell = scanRight
 
+-- | Scans right from the given index, following a cell separator line
+-- to the next column marker (@+@), then scans down. Returns the
+-- bottom-right index of the cell if it can complete the trace, and
+-- nothing if it reaches the end of line before the trace is complete.
+--
+-- All row and column markers found during scanning are seen are
+-- collected and returned as part of the result.
 scanRight :: CharGrid -> CharIndex -> Maybe ScanResult
 scanRight charGrid start@(top, left) = do
   loop Set.empty (left + 1)
@@ -234,7 +252,10 @@ scanRight charGrid start@(top, left) = do
                    )
           _ -> Nothing
 
-scanDown :: CharGrid -> CharIndex -> CharCol
+-- | Like 'scanRight', but scans down in the given column.
+scanDown :: CharGrid
+         -> CharIndex  -- ^ top-left corner of cell
+         -> CharCol    -- ^ column of the cell's right border
          -> Maybe ScanResult
 scanDown charGrid start@(top, _left) right = do
   loop Set.empty (top + 1)
@@ -259,6 +280,8 @@ scanDown charGrid start@(top, _left) right = do
                then loop rowseps (i + 1)
                else Nothing
 
+-- | Like 'scanRight', but scans left starting at the bottom-right
+-- corner.
 scanLeft :: CharGrid -> CharIndex -> CharIndex
          -> Maybe (RowSeps, ColSeps)
 scanLeft charGrid start@(_top,left) end@(bottom, right) =
@@ -279,6 +302,7 @@ scanLeft charGrid start@(_top,left) end@(bottom, right) =
              Just rowseps -> Just (rowseps, colseps)
              Nothing      -> Nothing
 
+-- | Scans up from the bottom-left corner back to the top-left corner.
 scanUp :: CharGrid -> CharIndex -> CharIndex
        -> Maybe RowSeps
 scanUp charGrid (top, left) (bottom, _right) =
@@ -290,7 +314,7 @@ scanUp charGrid (top, left) (bottom, _right) =
                               _        -> Nothing
   in foldr go (Just Set.empty) [bottom - 1, bottom - 2 .. top + 1]
 
--- | Get lines of a cell
+-- | Gets the textual contents, i.e. the lines of a cell.
 getLines :: CharGrid -> CharIndex -> CharIndex -> [Text]
 getLines charGrid (top, left) (bottom, right) =
   let rowIdxs = [top + 1 .. bottom - 1]
@@ -298,6 +322,7 @@ getLines charGrid (top, left) (bottom, right) =
   in map (\ir -> T.pack $ mapMaybe (\ic -> charGrid ! (ir, ic)) colIdxs)
          rowIdxs
 
+-- | Traced cell with raw contents and border positions.
 data CellTrace = CellTrace
   { cellTraceContent :: [Text]
   , cellTraceLeft    :: CharCol
@@ -340,6 +365,7 @@ tableFromTraceInfo traceInfo partSeps colSpecsFirstLine =
      , gridTableColSpecs = colSpecs
      }
 
+-- | Create a mutable cell array from the scanning data.
 toMutableArray :: TraceInfo
                -> Map.Map CharRow RowIndex
                -> Map.Map CharCol ColIndex
@@ -381,6 +407,7 @@ toMutableArray traceInfo rowindex colindex = do
       _ -> pure ())
   mapArray fromBuilderCell tblgrid
 
+-- | Calculate the array indices that are spanned by a cell.
 continuationIndices :: (RowIndex, ColIndex)
                     -> RowSpan -> ColSpan
                     -> [CellIndex]
@@ -391,6 +418,8 @@ continuationIndices (RowIndex ridx, ColIndex cidx) rowspan colspan =
                                 , c <- [cidx..(cidx + cs - 1)]
                                 , (r, c) /= (ridx, cidx)]
 
+-- | Helper type used to track which indices have been already been
+-- filled in a mutable cell array.
 data BuilderCell
   = FilledCell (GridCell [Text])
   | FreeCell

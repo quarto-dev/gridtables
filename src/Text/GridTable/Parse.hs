@@ -1,6 +1,5 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts   #-}
-{-# LANGUAGE LambdaCase         #-}
 {- |
 Module      : Text.GridTable
 Copyright   : © 2022 Albert Krewinkel
