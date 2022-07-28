@@ -22,7 +22,7 @@ import Text.Parsec
 import qualified Data.Text as T
 
 -- | Parses a grid table.
-gridTable :: Stream s m Char => ParsecT s u m (GridTable [Text])
+gridTable :: Stream s m Char => ParsecT s u m (ArrayTable [Text])
 gridTable = try $ do
   firstLine <- (:) <$> char '+'
                    <*> (mconcat <$> many1 (gridPart '-'))

@@ -3,7 +3,7 @@
 {-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE RankNTypes                 #-}
 {- |
-Module      : Text.GridTable
+Module      : Text.GridTable.Trace
 Copyright   : © 2022 Albert Krewinkel
 License     : MIT
 Maintainer  : Albert Krewinkel <albert@zeitkraut.de>
@@ -37,7 +37,7 @@ import qualified Data.Text as T
 
 -- | Traces out the cells in the given lines and converts them to a
 -- table containing the bare cell lines.
-traceLines :: [Text] -> Maybe (GridTable [Text])
+traceLines :: [Text] -> Maybe (ArrayTable [Text])
 traceLines lines =
   let charGrid = toCharGrid lines
       specs1   = colSpecsInLine '-' charGrid 1
@@ -342,7 +342,7 @@ instance Ord CellTrace where
 tableFromTraceInfo :: TraceInfo
                    -> [PartSeparator]
                    -> Maybe [ColSpec]
-                   -> GridTable [Text]
+                   -> ArrayTable [Text]
 tableFromTraceInfo traceInfo partSeps colSpecsFirstLine =
   let rowseps = Set.toAscList $ gridRowSeps traceInfo
       colseps = Set.toAscList $ gridColSeps traceInfo
@@ -359,10 +359,10 @@ tableFromTraceInfo traceInfo partSeps colSpecsFirstLine =
                   foldr ((<|>) . (`Map.lookup` rowindex) . partSepLine)
                         Nothing
                         partSeps
-  in GridTable
-     { gridTableArray = runSTArray (toMutableArray traceInfo rowindex colindex)
-     , gridTableHead = tableHead
-     , gridTableColSpecs = colSpecs
+  in ArrayTable
+     { arrayTableCells = runSTArray (toMutableArray traceInfo rowindex colindex)
+     , arrayTableHead = tableHead
+     , arrayTableColSpecs = colSpecs
      }
 
 -- | Create a mutable cell array from the scanning data.

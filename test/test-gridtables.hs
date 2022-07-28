@@ -45,7 +45,7 @@ linesTests = testGroup "lines"
 
 -- | Test parsing of a text as grid tables.
 gridTableTests :: TestTree
-gridTableTests = testGroup "parseGridTable"
+gridTableTests = testGroup "parseArrayTable"
   [ testCase "single cell" $
     let gt = T.unlines
              [ "+-----+"
@@ -56,10 +56,10 @@ gridTableTests = testGroup "parseGridTable"
                   , (RowIndex 1, ColIndex 1)
                   )
     in parse' gridTable gt @?=
-       Right (GridTable
-              { gridTableArray = listArray gbounds [ContentCell 1 1 [" one "]]
-              , gridTableHead = Nothing
-              , gridTableColSpecs = defaultAlign [5]
+       Right (ArrayTable
+              { arrayTableCells = listArray gbounds [ContentCell 1 1 [" one "]]
+              , arrayTableHead = Nothing
+              , arrayTableColSpecs = defaultAlign [5]
               })
 
   , testCase "multi-cell row" $
@@ -72,13 +72,13 @@ gridTableTests = testGroup "parseGridTable"
                   , (RowIndex 1, ColIndex 2)
                   )
     in parse' gridTable gt @?=
-       Right (GridTable
-              { gridTableArray = listArray gbounds
+       Right (ArrayTable
+              { arrayTableCells = listArray gbounds
                                  [ ContentCell 1 1 [" one "]
                                  , ContentCell 1 1 [" two "]
                                  ]
-              , gridTableHead = Nothing
-              , gridTableColSpecs = defaultAlign [5, 5]
+              , arrayTableHead = Nothing
+              , arrayTableColSpecs = defaultAlign [5, 5]
               })
 
 
@@ -92,13 +92,13 @@ gridTableTests = testGroup "parseGridTable"
                   , (RowIndex 1, ColIndex 2)
                   )
     in parse' gridTable gt @?=
-       Right (GridTable
-              { gridTableArray = listArray gbounds
+       Right (ArrayTable
+              { arrayTableCells = listArray gbounds
                                  [ ContentCell 1 1 [" 魚 "]
                                  , ContentCell 1 1 [" fish "]
                                  ]
-              , gridTableHead = Nothing
-              , gridTableColSpecs = defaultAlign [4, 6]
+              , arrayTableHead = Nothing
+              , arrayTableColSpecs = defaultAlign [4, 6]
               })
 
   , testCase "two-row table" $
@@ -113,13 +113,13 @@ gridTableTests = testGroup "parseGridTable"
                   , (RowIndex 2, ColIndex 1)
                   )
     in parse' gridTable gt @?=
-       Right (GridTable
-              { gridTableArray = listArray gbounds
+       Right (ArrayTable
+              { arrayTableCells = listArray gbounds
                                  [ ContentCell 1 1 [" one "]
                                  , ContentCell 1 1 [" two "]
                                  ]
-              , gridTableHead = Nothing
-              , gridTableColSpecs = defaultAlign [5]
+              , arrayTableHead = Nothing
+              , arrayTableColSpecs = defaultAlign [5]
               })
 
   , testCase "rowspan" $
@@ -134,15 +134,15 @@ gridTableTests = testGroup "parseGridTable"
                   , (RowIndex 2, ColIndex 2)
                   )
     in parse' gridTable gt @?=
-       Right (GridTable
-              { gridTableArray = listArray gbounds
+       Right (ArrayTable
+              { arrayTableCells = listArray gbounds
                 [ ContentCell 2 1 [" one ", "     ", "     "]
                 , ContentCell 1 1 [" two   "]
                 , ContinuationCell (1, 1)
                 , ContentCell 1 1 [" three "]
                 ]
-              , gridTableHead = Nothing
-              , gridTableColSpecs = defaultAlign [5, 7]
+              , arrayTableHead = Nothing
+              , arrayTableColSpecs = defaultAlign [5, 7]
               })
 
   , testGroup "table head"
@@ -158,15 +158,15 @@ gridTableTests = testGroup "parseGridTable"
                     , (RowIndex 2, ColIndex 2)
                     )
       in parse' gridTable gt @?=
-         Right (GridTable
-                { gridTableArray = listArray gbounds
+         Right (ArrayTable
+                { arrayTableCells = listArray gbounds
                   [ ContentCell 1 1 [" one "]
                   , ContentCell 1 1 [" two "]
                   , ContentCell 1 1 ["  1  "]
                   , ContentCell 1 1 ["  2  "]
                   ]
-                , gridTableHead = Just 1
-                , gridTableColSpecs = defaultAlign [5, 5]
+                , arrayTableHead = Just 1
+                , arrayTableColSpecs = defaultAlign [5, 5]
                 })
 
     , testCase "alignment markers" $
@@ -178,8 +178,8 @@ gridTableTests = testGroup "parseGridTable"
                , "+------+--------+-------+"
                ]
       in parse' gridTable gt @?=
-         Right (GridTable
-                { gridTableArray = listArray ((1,1), (2, 3))
+         Right (ArrayTable
+                { arrayTableCells = listArray ((1,1), (2, 3))
                   [ ContentCell 1 1 [" left "]
                   , ContentCell 1 1 [" center "]
                   , ContentCell 1 1 [" right "]
@@ -187,8 +187,8 @@ gridTableTests = testGroup "parseGridTable"
                   , ContentCell 1 1 [" 2      "]
                   , ContentCell 1 1 [" 3     "]
                   ]
-                , gridTableHead = Just 1
-                , gridTableColSpecs = [ (6, AlignLeft)
+                , arrayTableHead = Just 1
+                , arrayTableColSpecs = [ (6, AlignLeft)
                                       , (8, AlignCenter)
                                       , (7, AlignRight)
                                       ]
@@ -204,8 +204,8 @@ gridTableTests = testGroup "parseGridTable"
              , "+------+--------+-------+"
              ]
     in parse' gridTable gt @?=
-       Right (GridTable
-              { gridTableArray = listArray ((1,1), (2, 3))
+       Right (ArrayTable
+              { arrayTableCells = listArray ((1,1), (2, 3))
                 [ ContentCell 1 1 [" left "]
                 , ContentCell 1 1 [" center "]
                 , ContentCell 1 1 [" right "]
@@ -213,8 +213,8 @@ gridTableTests = testGroup "parseGridTable"
                 , ContentCell 1 1 [" b 2    "]
                 , ContentCell 1 1 [" c 3   "]
                 ]
-              , gridTableHead = Nothing
-              , gridTableColSpecs = [ (6, AlignLeft)
+              , arrayTableHead = Nothing
+              , arrayTableColSpecs = [ (6, AlignLeft)
                                     , (8, AlignCenter)
                                     , (7, AlignRight)
                                     ]
@@ -230,11 +230,11 @@ gridTableTests = testGroup "parseGridTable"
                   , (RowIndex 1, ColIndex 1)
                   )
     in parse' gridTable gt @?=
-       Right (GridTable
-              { gridTableArray = listArray gbounds
+       Right (ArrayTable
+              { arrayTableCells = listArray gbounds
                                  [ ContentCell 1 1 [" one"]]
-              , gridTableHead = Nothing
-              , gridTableColSpecs = defaultAlign [5]
+              , arrayTableHead = Nothing
+              , arrayTableColSpecs = defaultAlign [5]
               })
 
   , testCase "trailing spaces" $
@@ -244,11 +244,11 @@ gridTableTests = testGroup "parseGridTable"
              , "+---+"
              ]
     in parse' gridTable ls @?=
-       Right (GridTable
-              { gridTableArray = listArray ((1,1), (1,1))
+       Right (ArrayTable
+              { arrayTableCells = listArray ((1,1), (1,1))
                                  [ ContentCell 1 1 [" 1 "]]
-              , gridTableHead = Nothing
-              , gridTableColSpecs = defaultAlign [3]
+              , arrayTableHead = Nothing
+              , arrayTableColSpecs = defaultAlign [3]
               })
 
   , testCase "followed by non-empty line" $
@@ -274,16 +274,16 @@ gridTableTests = testGroup "parseGridTable"
 
   , testGroup "access functions"
     [ testCase "rows" $
-      let gt = GridTable
-               { gridTableArray = listArray ((1, 1), (2, 2))
+      let gt = ArrayTable
+               { arrayTableCells = listArray ((1, 1), (2, 2))
                  [ ContentCell 2 1 "1"
                  , ContentCell 1 1 "2"
                  , ContinuationCell (1, 1)
                  , ContentCell 1 1 "3"
                  ]
-               , gridTableHead = Nothing
-               , gridTableColSpecs = defaultAlign [5, 7]
-               } :: GridTable Text
+               , arrayTableHead = Nothing
+               , arrayTableColSpecs = defaultAlign [5, 7]
+               } :: ArrayTable Text
       in rows gt @?= [ [Cell "1" 2 1, Cell "2" 1 1]
                      , [Cell "3" 1 1]
                      ]

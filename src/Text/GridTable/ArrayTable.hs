@@ -11,7 +11,7 @@ Grid table representation based on arrays.
 -}
 
 module Text.GridTable.ArrayTable
-  ( GridTable (..)
+  ( ArrayTable (..)
   , GridCell (..)
   , RowSpan (..)
   , ColSpan (..)
@@ -26,24 +26,26 @@ import Data.Array (Array, Ix)
 import Data.Array.MArray (mapArray, thaw)
 import Data.Array.ST (runSTArray)
 
--- | Grid table: Cells are placed on a grid.
-data GridTable a = GridTable
-  { gridTableArray :: Array CellIndex (GridCell a)
-  , gridTableHead  :: Maybe RowIndex
-  , gridTableColSpecs :: [(Int, Alignment)]
+-- | Table representation based on an array; cells are placed on a grid,
+-- with indices spanned by other cells containing placeholder cells that
+-- point to the spanning cell.
+data ArrayTable a = ArrayTable
+  { arrayTableCells   :: Array CellIndex (GridCell a)
+  , arrayTableHead     :: Maybe RowIndex
+  , arrayTableColSpecs :: [(Int, Alignment)]
   }
   deriving stock (Eq, Show)
 
 -- | Apply a function to all cell contents in a grid table.
-mapCells :: (a -> b) -> GridTable a -> GridTable b
+mapCells :: (a -> b) -> ArrayTable a -> ArrayTable b
 mapCells f gt =
   let f' = \case
         ContentCell rs cs c  -> ContentCell rs cs $ f c
         ContinuationCell idx -> ContinuationCell idx
       cellArray = runSTArray $ do
-        mut <- thaw $ gridTableArray gt
+        mut <- thaw $ arrayTableCells gt
         mapArray f' mut
-  in gt { gridTableArray = cellArray }
+  in gt { arrayTableCells = cellArray }
 
 -- | Row index in a table array.
 newtype RowIndex = RowIndex { fromRowIndex :: Int }

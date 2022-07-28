@@ -31,9 +31,9 @@ colBounds :: Array CellIndex a -> (ColIndex, ColIndex)
 colBounds = bimap snd snd . bounds
 
 -- | Returns the rows of a grid table as lists of simple cells.
-rows :: GridTable a -> [[Cell a]]
+rows :: ArrayTable a -> [[Cell a]]
 rows gt =
-  let tarr = gridTableArray gt
+  let tarr = arrayTableCells gt
       ncols = fromColIndex . uncurry (flip (-)) $ colBounds tarr
       toSimpleCell = \case
         ContentCell rs cs c -> Just $ Cell c rs cs
