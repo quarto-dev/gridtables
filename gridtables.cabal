@@ -2,7 +2,10 @@ cabal-version:       2.4
 name:                gridtables
 version:             0.0.1.0
 synopsis:            Parser for reStructuredText-style grid tables.
-description:         Parsec parser for grid tables.
+description:         Provides a parser for plain-text representations of
+                     tables. This package supports table headers, cells
+                     spanning multiple columns or rows, as well as a way
+                     to specfiy column alignments.
 homepage:            https://github.com/tarleb/gridtables
 bug-reports:         https://github.com/tarleb/gridtables/issues
 license:             MIT
