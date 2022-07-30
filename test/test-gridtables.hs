@@ -222,6 +222,79 @@ gridTableTests = testGroup "parseArrayTable"
                                      ]
               })
 
+  , testGroup "Char widths"
+    [ testCase "wide character" $
+      let gt = T.unlines
+               [ "+--+---+"
+               , "|魚| x |"
+               , "+--+---+"
+               ]
+      in parse' gridTable gt @?=
+         Right (ArrayTable
+                { arrayTableCells = listArray ((1,1), (1, 2))
+                  [ ContentCell 1 1 ["魚"] , ContentCell 1 1 [" x "]]
+                , arrayTableHead = Nothing
+                , arrayTableColSpecs = defaultAlign [2, 3]
+                })
+
+    , testCase "zero-width space" $
+      let gt = T.unlines
+               [ "+--+---+"
+               , "|x\8203y| z |"
+               , "+--+---+"
+               ]
+      in parse' gridTable gt @?=
+         Right (ArrayTable
+                { arrayTableCells = listArray ((1,1), (1, 2))
+                  [ ContentCell 1 1 ["x\8203y"] , ContentCell 1 1 [" z "]]
+                , arrayTableHead = Nothing
+                , arrayTableColSpecs = defaultAlign [2, 3]
+                })
+
+    , testCase "zero-width space after wide character" $
+      let gt = T.unlines
+               [ "+---+---+"
+               , "|魚\8203y| z |"
+               , "+---+---+"
+               ]
+      in parse' gridTable gt @?=
+         Right (ArrayTable
+                { arrayTableCells = listArray ((1,1), (1, 2))
+                  [ ContentCell 1 1 ["魚\8203y"] , ContentCell 1 1 [" z "]]
+                , arrayTableHead = Nothing
+                , arrayTableColSpecs = defaultAlign [3, 3]
+                })
+
+    , testCase "wide character after zero-width space" $
+      let gt = T.unlines
+               [ "+---+---+"
+               , "|y\8203魚| z |"
+               , "+---+---+"
+               ]
+      in parse' gridTable gt @?=
+         Right (ArrayTable
+                { arrayTableCells = listArray ((1,1), (1, 2))
+                  [ ContentCell 1 1 ["y\8203魚"] , ContentCell 1 1 [" z "]]
+                , arrayTableHead = Nothing
+                , arrayTableColSpecs = defaultAlign [3, 3]
+                })
+
+    , testCase "multiple zero-width characters" $
+      let gt = T.unlines
+               [ "+--+---+"
+               , "|a\8204\8205b| c |"
+               , "+--+---+"
+               ]
+      in parse' gridTable gt @?=
+         Right (ArrayTable
+                { arrayTableCells = listArray ((1,1), (1, 2))
+                  [ ContentCell 1 1 ["a\8204\8205b"] , ContentCell 1 1 [" c "]]
+                , arrayTableHead = Nothing
+                , arrayTableColSpecs = defaultAlign [2, 3]
+                })
+
+    ]
+
   , testCase "unterminated row" $
     let gt = T.unlines
              [ "+-----+"

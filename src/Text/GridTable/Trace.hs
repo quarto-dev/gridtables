@@ -26,7 +26,7 @@ import Data.Array
 import Data.Array.MArray
 import Data.Array.ST
 import Data.Function (on)
-import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Maybe (fromMaybe)
 import Data.Set (Set)
 import Data.Text (Text)
 import Text.DocLayout (charWidth)
@@ -49,7 +49,7 @@ traceLines lines =
      else return $ tableFromTraceInfo traceInfo partSeps specs1
 
 -- | Type used to represent the 2D layout of table characters
-type CharGrid = Array (CharRow, CharCol) (Maybe Char)
+type CharGrid = Array (CharRow, CharCol) GChar
 
 -- | Index of a half-width character in the character-wise
 -- representation.
@@ -65,19 +65,31 @@ newtype CharCol = CharCol { fromCharCol :: Int }
   deriving stock (Eq, Show)
   deriving newtype (Enum, Ix, Num, Ord)
 
--- | Converts a list of lines into an char array.
+data GChar
+  = C Char           -- ^ half- or full-width character
+  | CZ [Char] Char   -- ^ character preceded by zero-width chars
+  | WP               -- ^ padding for wide characters
+  | Missing          -- ^ padding for short lines
+  deriving stock (Eq)
+
+-- | Converts a list of lines into a char array.
 toCharGrid :: [Text] -> CharGrid
 toCharGrid lines =
   let chars = foldr (\t m -> max m (T.length t)) 0 lines
       gbounds = ( (CharRow 1, CharCol 1)
                 , (CharRow (length lines), CharCol chars)
                 )
-      charList c = case charWidth c of
-                     2 -> [Just c, Nothing]
-                     _ -> [Just c]
-      extendedLines = map ((\line -> take chars (line ++ repeat Nothing))
-                            . concatMap charList . T.unpack)
-                          lines
+      toGChars []     = repeat Missing
+      toGChars (c:cs) = case charWidth c of
+        2 -> C c : WP : toGChars cs
+        1 -> C c : toGChars cs
+        _ -> case span ((== 0) . charWidth) cs of
+               (zw, [])     -> [CZ (c:zw) '\0']
+               (zw, c':cs') -> CZ (c:zw) c' :
+                               case charWidth c' of
+                                 2 -> WP : toGChars cs'
+                                 _ -> toGChars cs'
+      extendedLines = map (take chars . toGChars . T.unpack) lines
   in listArray gbounds (mconcat extendedLines)
 
 -- | Information on, and extracted from, a body separator line. This is a line
@@ -111,8 +123,8 @@ colSpecsInLine :: Char  -- ^ Character used in line (usually @-@)
                -> CharGrid -> CharRow -> Maybe [ColSpec]
 colSpecsInLine c charGrid i =
   case charGrid ! (i, firstCol) of
-    Just '+' -> loop [] (firstCol + 1)
-    _        -> Nothing
+    C '+' -> loop [] (firstCol + 1)
+    _     -> Nothing
   where
     loop acc j = case colSpecAt j of
                    Nothing      -> Nothing
@@ -128,7 +140,7 @@ colSpecsInLine c charGrid i =
       | otherwise = case findEnd (j + 1) of
           Nothing               -> Nothing
           Just (end, rightMark) ->
-            let leftMark = charGrid ! (i, j) == Just ':'
+            let leftMark = charGrid ! (i, j) == C ':'
                 align = case (leftMark, rightMark) of
                   (False , False) -> AlignDefault
                   (True  , False) -> AlignLeft
@@ -141,11 +153,11 @@ colSpecsInLine c charGrid i =
                   }
             in pure (pure colspec)
     findEnd j = case charGrid ! (i, j) of
-      Just '+' -> pure (j, False)
-      Just ':' -> if charGrid ! (i, j + 1) == Just '+'
+      C '+' -> pure (j, False)
+      C ':' -> if charGrid ! (i, j + 1) == C '+'
                   then pure (j + 1, True)
                   else Nothing
-      Just c'
+      C c'
         | c' == c -> findEnd (j + 1)
       _           -> Nothing
 
@@ -162,8 +174,8 @@ convertToNormalLines sepLines charGrid = runSTArray $ do
       c <- readArray mutGrid idx
       -- convert `=` to `-` and remove alignment markers
       case c of
-        Just '=' -> writeArray mutGrid idx (Just '-')
-        Just ':' -> writeArray mutGrid idx (Just '-')
+        C '=' -> writeArray mutGrid idx (C '-')
+        C ':' -> writeArray mutGrid idx (C '-')
         _        -> pure ()
   return mutGrid
 
@@ -240,8 +252,8 @@ scanRight charGrid start@(top, left) = do
     loop colseps j
       | not (bounds charGrid `inRange` (top, j)) = Nothing
       | otherwise = case charGrid ! (top, j) of
-          Just '-' -> loop colseps (j + 1)
-          Just '+' ->
+          C '-' -> loop colseps (j + 1)
+          C '+' ->
             let colseps' = Set.insert j colseps
             in case scanDown charGrid start j of
                  Nothing -> loop colseps' (j + 1)
@@ -265,7 +277,7 @@ scanDown charGrid start@(top, _left) right = do
       if not (bounds charGrid `inRange` (i, right))
       then Nothing
       else case charGrid ! (i, right) of
-             Just '+' ->
+             C '+' ->
                let rowseps' = Set.insert i rowseps
                in case scanLeft charGrid start (i, right) of
                     Nothing -> loop rowseps' (i + 1)
@@ -274,7 +286,7 @@ scanDown charGrid start@(top, _left) right = do
                            , rowseps' `Set.union` newrowseps
                            , colseps
                            )
-             Just '|' -> loop rowseps (i + 1)
+             C '|' -> loop rowseps (i + 1)
              _ -> -- all but the final column must be terminated
                if right == snd (snd (bounds charGrid))
                then loop rowseps (i + 1)
@@ -288,11 +300,11 @@ scanLeft charGrid start@(_top,left) end@(bottom, right) =
   let  go :: CharCol -> Maybe ColSeps -> Maybe ColSeps
        go _ Nothing = Nothing
        go j (Just colseps) = case charGrid ! (bottom, j) of
-                               Just '+' -> Just (Set.insert j colseps)
-                               Just '-' -> Just colseps
+                               C '+' -> Just (Set.insert j colseps)
+                               C '-' -> Just colseps
                                _        -> Nothing
 
-  in if charGrid ! (bottom, left) /= Just '+'
+  in if charGrid ! (bottom, left) /= C '+'
      then Nothing
      else
        case foldr go (Just Set.empty) [(right - 1), right - 2 .. (left + 1)] of
@@ -309,8 +321,8 @@ scanUp charGrid (top, left) (bottom, _right) =
   let go :: CharRow -> Maybe RowSeps -> Maybe RowSeps
       go _ Nothing = Nothing
       go i (Just rowseps) = case charGrid ! (i, left) of
-                              Just '+' -> Just (Set.insert i rowseps)
-                              Just '|' -> Just rowseps
+                              C '+' -> Just (Set.insert i rowseps)
+                              C '|' -> Just rowseps
                               _        -> Nothing
   in foldr go (Just Set.empty) [bottom - 1, bottom - 2 .. top + 1]
 
@@ -319,7 +331,11 @@ getLines :: CharGrid -> CharIndex -> CharIndex -> [Text]
 getLines charGrid (top, left) (bottom, right) =
   let rowIdxs = [top + 1 .. bottom - 1]
       colIdxs = [left + 1 .. right - 1]
-  in map (\ir -> T.pack $ mapMaybe (\ic -> charGrid ! (ir, ic)) colIdxs)
+      toChars rowIdx colIdx = case charGrid ! (rowIdx, colIdx) of
+        C c     -> [c]
+        CZ zw c -> zw ++ [c]
+        _       -> []
+  in map (\ir -> T.pack $ concatMap (toChars ir) colIdxs)
          rowIdxs
 
 -- | Traced cell with raw contents and border positions.
