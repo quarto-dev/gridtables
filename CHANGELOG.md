@@ -2,7 +2,7 @@
 
 `gridtables` uses [PVP Versioning][].
 
-## gridtables-0.0.2
+## gridtables-0.0.2.0
 
 Released 2022-07-30.
 
@@ -10,7 +10,7 @@ Released 2022-07-30.
     space or the word joiner, as having no width.
 
 
-## gridtables-0.0.1
+## gridtables-0.0.1.0
 
 Released 2022-07-29.
 
