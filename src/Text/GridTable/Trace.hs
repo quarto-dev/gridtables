@@ -72,10 +72,30 @@ data GChar
   | Missing          -- ^ padding for short lines
   deriving stock (Eq)
 
+-- | Info on the grid. Used to keep track of information collected while
+-- tracing a character grid. The set of cells is used as a kind of queue
+-- during parsing, while the other data is required to assemble the
+-- final table.
+data TraceInfo = TraceInfo
+  { gridRowSeps  :: Set CharRow
+  , gridColSeps  :: Set CharCol
+  , gridCorners  :: Set CharIndex
+  , gridCells    :: Set CellTrace
+  }
+
+-- | Initial tracing info.
+initialTraceInfo :: TraceInfo
+initialTraceInfo = TraceInfo
+  { gridRowSeps  = Set.fromList [CharRow 1]
+  , gridColSeps  = Set.fromList [CharCol 1]
+  , gridCorners  = Set.fromList [(CharRow 1, CharCol 1)]
+  , gridCells    = Set.empty
+  }
+
 -- | Converts a list of lines into a char array.
 toCharGrid :: [Text] -> CharGrid
 toCharGrid lines =
-  let chars = foldr (\t m -> max m (T.length t)) 0 lines
+  let chars = foldr (\t m -> max m (T.length t)) 0 lines -- potential overcount
       gbounds = ( (CharRow 1, CharCol 1)
                 , (CharRow (length lines), CharCol chars)
                 )
@@ -178,26 +198,6 @@ convertToNormalLines sepLines charGrid = runSTArray $ do
         C ':' -> writeArray mutGrid idx (C '-')
         _        -> pure ()
   return mutGrid
-
--- | Info on the grid. Used to keep track of information collected while
--- tracing a character grid. The set of cells is used as a kind of queue
--- during parsing, while the other data is required to assemble the
--- final table.
-data TraceInfo = TraceInfo
-  { gridRowSeps :: Set CharRow
-  , gridColSeps :: Set CharCol
-  , gridCorners :: Set CharIndex
-  , gridCells   :: Set CellTrace
-  }
-
--- | Initial tracing info.
-initialTraceInfo :: TraceInfo
-initialTraceInfo = TraceInfo
-  { gridRowSeps = Set.fromList [CharRow 1]
-  , gridColSeps = Set.fromList [CharCol 1]
-  , gridCorners = Set.fromList [(CharRow 1, CharCol 1)]
-  , gridCells   = Set.fromList []
-  }
 
 -- | Trace the given char grid and collect all relevant info.
 -- This function calls itself recursively.
@@ -418,11 +418,10 @@ toMutableArray traceInfo rowindex colindex = do
   let fromBuilderCell :: BuilderCell -> GridCell [Text]
       fromBuilderCell = \case
         FilledCell c -> c
-        FreeCell     -> error "Found an unassigned cell."
-  getAssocs tblgrid >>= (\kvs -> forM_ kvs $ \(idx, bc) ->
-    case bc of
-      FreeCell -> error $ "unassigned: " ++ show idx
-      _ -> pure ())
+        FreeCell     ->
+          -- Found an unassigned cell; replace with empty cell. TODO: This
+          -- should be reported as a warning.
+          ContentCell 1 1 mempty
   mapArray fromBuilderCell tblgrid
 
 -- | Calculate the array indices that are spanned by a cell.
