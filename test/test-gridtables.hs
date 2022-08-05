@@ -340,6 +340,25 @@ gridTableTests = testGroup "parseArrayTable"
               , arrayTableColSpecs = defaultAlign [3]
               })
 
+  , testCase "top row that's too short" $
+    let ls = T.unlines
+             [ "+---+-+"
+             , "|one|two|"
+             , "+---+---+"
+             , "|one|two|"
+             , "+---+---+"
+             ]
+    in parse' gridTable ls @?=
+       Right (ArrayTable
+              { arrayTableCells = listArray ((1,1), (2,2))
+                                 [ ContentCell 1 1 ["one"]
+                                 , ContentCell 1 1 ["two"]
+                                 , ContentCell 1 1 ["one"]
+                                 , ContentCell 1 1 ["two"]]
+              , arrayTableHead = Nothing
+              , arrayTableColSpecs = defaultAlign [3, 3]
+              })
+
   , testCase "missing cell" $
     let ls = T.unlines
              [ "+---+"

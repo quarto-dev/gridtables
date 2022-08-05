@@ -26,6 +26,7 @@ import Data.Array
 import Data.Array.MArray
 import Data.Array.ST
 import Data.Function (on)
+import Data.List (foldl')
 import Data.Maybe (fromMaybe)
 import Data.Set (Set)
 import Data.Text (Text)
@@ -256,7 +257,8 @@ scanRight charGrid start@(top, left) = do
           C '+' ->
             let colseps' = Set.insert j colseps
             in case scanDown charGrid start j of
-                 Nothing -> loop colseps' (j + 1)
+                 Nothing -> loop colseps' (j + 1) <|>
+                            lastCellInRow charGrid start (j + 1)
                  Just (end, rowseps, newcolseps) -> pure
                    ( end
                    , rowseps
@@ -302,7 +304,7 @@ scanLeft charGrid start@(_top,left) end@(bottom, right) =
        go j (Just colseps) = case charGrid ! (bottom, j) of
                                C '+' -> Just (Set.insert j colseps)
                                C '-' -> Just colseps
-                               _        -> Nothing
+                               _     -> Nothing
 
   in if charGrid ! (bottom, left) /= C '+'
      then Nothing
@@ -323,8 +325,46 @@ scanUp charGrid (top, left) (bottom, _right) =
       go i (Just rowseps) = case charGrid ! (i, left) of
                               C '+' -> Just (Set.insert i rowseps)
                               C '|' -> Just rowseps
-                              _        -> Nothing
+                              _     -> Nothing
   in foldr go (Just Set.empty) [bottom - 1, bottom - 2 .. top + 1]
+
+lastCellInRow :: CharGrid -> CharIndex -> CharCol -> Maybe ScanResult
+lastCellInRow charGrid start@(top, _left) right =
+  if bounds charGrid `inRange` (top, right) &&
+     charGrid ! (top, right) == Missing
+  then scanRestOfLines charGrid start
+  else Nothing
+
+lastColumn :: CharGrid -> CharCol
+lastColumn = snd . snd . bounds
+
+lastRow :: CharGrid -> CharRow
+lastRow = fst . snd . bounds
+
+scanRightRestOfLine :: CharGrid -> CharIndex -> CharRow -> Maybe ColSeps
+scanRightRestOfLine charGrid (_top, left) bottom =
+  let  go :: CharCol -> Maybe ColSeps -> Maybe ColSeps
+       go _ Nothing = Nothing
+       go j (Just colseps) = case charGrid ! (bottom, j) of
+                               C '+'   -> Just (Set.insert j colseps)
+                               C '-'   -> Just colseps
+                               Missing -> Just colseps
+                               _       -> Nothing
+
+  in if charGrid ! (bottom, left) /= C '+'
+     then Nothing
+     else foldr go (Just Set.empty) [left + 1 .. lastColumn charGrid]
+
+scanRestOfLines :: CharGrid -> CharIndex -> Maybe ScanResult
+scanRestOfLines charGrid start@(top, _left) =
+  let  go :: Maybe CharIndex -> CharRow -> Maybe CharIndex
+       go idx i = idx <|>
+                  case scanRightRestOfLine charGrid start i of
+                    Nothing -> Nothing
+                    Just _colseps -> Just (i, lastColumn charGrid)
+  in case foldl' go Nothing [top + 1 .. lastRow charGrid] of
+       Just bottomRight -> Just (bottomRight, Set.empty, Set.empty)
+       Nothing          -> Nothing
 
 -- | Gets the textual contents, i.e. the lines of a cell.
 getLines :: CharGrid -> CharIndex -> CharIndex -> [Text]
