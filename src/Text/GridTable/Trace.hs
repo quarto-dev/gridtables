@@ -363,7 +363,10 @@ scanRestOfLines charGrid start@(top, _left) =
                     Nothing -> Nothing
                     Just _colseps -> Just (i, lastColumn charGrid)
   in case foldl' go Nothing [top + 1 .. lastRow charGrid] of
-       Just bottomRight -> Just (bottomRight, Set.empty, Set.empty)
+       Just (bottom, right) -> Just
+                               ( (bottom, right)
+                               , Set.singleton bottom
+                               , Set.singleton right)
        Nothing          -> Nothing
 
 -- | Gets the textual contents, i.e. the lines of a cell.

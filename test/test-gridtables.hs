@@ -359,6 +359,30 @@ gridTableTests = testGroup "parseArrayTable"
               , arrayTableColSpecs = defaultAlign [3, 3]
               })
 
+  , testCase "all vertical seps in last column too short" $
+    let ls = T.unlines
+             [ "+----+:-:+"
+             , "|eins|long text|"
+             , "+----+---+"
+             , "|zwei|long text|"
+             , "+----+---+"
+             , "|drei|more text|"
+             , "+----+---+"
+             ]
+    in parse' gridTable ls @?=
+       Right (ArrayTable
+              { arrayTableCells = listArray ((1,1), (3,2))
+                                 [ ContentCell 1 1 ["eins"]
+                                 , ContentCell 1 1 ["long text"]
+                                 , ContentCell 1 1 ["zwei"]
+                                 , ContentCell 1 1 ["long text"]
+                                 , ContentCell 1 1 ["drei"]
+                                 , ContentCell 1 1 ["more text"]
+                                 ]
+              , arrayTableHead = Nothing
+              , arrayTableColSpecs = defaultAlign [4, 9]
+              })
+
   , testCase "missing cell" $
     let ls = T.unlines
              [ "+---+"
