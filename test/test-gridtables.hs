@@ -293,6 +293,20 @@ gridTableTests = testGroup "parseArrayTable"
                 , arrayTableColSpecs = defaultAlign [2, 3]
                 })
 
+    , testCase "many wide chars" $
+      let gt = T.unlines
+               [ "+----------+-+"
+               , "|１２３４５|a|"
+               , "+----------+-+"
+               ]
+      in parse' gridTable gt @?=
+         Right (ArrayTable
+                { arrayTableCells = listArray ((1,1), (1, 2))
+                  [ ContentCell 1 1 ["１２３４５"] , ContentCell 1 1 ["a"]]
+                , arrayTableHead = Nothing
+                , arrayTableColSpecs = defaultAlign [10, 1]
+                })
+
     ]
 
   , testCase "unterminated row" $
