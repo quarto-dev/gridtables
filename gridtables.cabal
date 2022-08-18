@@ -1,6 +1,6 @@
 cabal-version:       2.4
 name:                gridtables
-version:             0.0.2.0
+version:             0.0.3.0
 synopsis:            Parser for reStructuredText-style grid tables.
 description:         Provides a parser for plain-text representations of
                      tables. This package supports table headers, cells
