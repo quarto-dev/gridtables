@@ -58,6 +58,7 @@ library
   hs-source-dirs:      src
   build-depends:       containers
                      , doclayout
+                     , text-table
   exposed-modules:     Text.GridTable
                      , Text.GridTable.ArrayTable
                      , Text.GridTable.Parse

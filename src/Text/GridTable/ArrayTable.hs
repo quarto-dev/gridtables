@@ -25,6 +25,7 @@ module Text.GridTable.ArrayTable
 import Data.Array (Array, Ix)
 import Data.Array.MArray (mapArray, thaw)
 import Data.Array.ST (runSTArray)
+import Text.Table.Cell (ColSpan (..), RowSpan (..))
 
 -- | Table representation based on an array; cells are placed on a grid,
 -- with indices spanned by other cells containing placeholder cells that
@@ -67,16 +68,6 @@ data GridCell a
   = ContentCell RowSpan ColSpan a
   | ContinuationCell CellIndex
   deriving stock (Eq, Show)
-
--- | The number of rows spanned by a cell.
-newtype RowSpan = RowSpan Int
-  deriving stock (Eq, Ord)
-  deriving newtype (Enum, Num, Read, Show)
-
--- | The number of columns spanned by a cell.
-newtype ColSpan = ColSpan Int
-  deriving stock (Eq, Ord)
-  deriving newtype (Enum, Num, Read, Show)
 
 -- | Cell alignment
 data Alignment

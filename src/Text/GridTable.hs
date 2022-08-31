@@ -26,6 +26,7 @@ import Data.Bifunctor (bimap)
 import Data.Maybe (mapMaybe)
 import Text.GridTable.ArrayTable
 import Text.GridTable.Parse (gridTable)
+import Text.Table.Cell (Cell (..))
 
 colBounds :: Array CellIndex a -> (ColIndex, ColIndex)
 colBounds = bimap snd snd . bounds
@@ -44,11 +45,3 @@ rows gt =
         xs -> let (r, xs') = splitAt (ncols + 1) xs
               in mkRows (mapMaybe toSimpleCell r:rs) xs'
   in mkRows [] $ elems tarr
-
--- | Raw grid table cell
-data Cell a = Cell
-  { cellContent :: a
-  , cellRowSpan :: RowSpan
-  , cellColSpan :: ColSpan
-  }
-  deriving stock (Eq, Ord, Show)
