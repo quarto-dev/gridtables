@@ -43,6 +43,9 @@ traceLines lines =
   let charGrid = toCharGrid lines
       specs1   = colSpecsInLine '-' charGrid 1
       partSeps = findSeparators charGrid
+      -- The first separator can never be a part separator line (with
+      -- =), but it can contain column alignment markers, so it is
+      -- always normalized it as well.
       charGrid' = convertToNormalLines (1:map partSepLine partSeps) charGrid
       traceInfo = traceCharGrid charGrid' initialTraceInfo
   in if Set.null (gridCells traceInfo)
@@ -416,13 +419,20 @@ tableFromTraceInfo traceInfo partSeps colSpecsFirstLine =
                    ++ repeat AlignDefault)
                  (map fromCharCol colwidths)
       lastCol = ColIndex (length colwidths)
-      tableHead = subtract 1 <$>
-                  foldr ((<|>) . (`Map.lookup` rowindex) . partSepLine)
-                        Nothing
-                        partSeps
+      (tableHead, tableFoot) = case partSeps of
+        []     -> (Nothing, Nothing)
+        ps:pss -> ( subtract 1 <$> partSepLine ps `Map.lookup` rowindex
+                  , case reverse pss of
+                      psf:psf':_
+                        | Just (partSepLine psf) ==
+                          Set.lookupMax (gridRowSeps traceInfo) ->
+                            partSepLine psf' `Map.lookup` rowindex
+                      _        -> Nothing
+                  )
   in ArrayTable
      { arrayTableCells = runSTArray (toMutableArray traceInfo rowindex colindex)
      , arrayTableHead = tableHead
+     , arrayTableFoot = tableFoot
      , arrayTableColSpecs = listArray (1, lastCol) colSpecs
      }
 
