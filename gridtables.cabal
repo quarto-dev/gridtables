@@ -12,7 +12,7 @@ license:             MIT
 license-file:        LICENSE
 author:              Albert Krewinkel
 maintainer:          Albert Krewinkel <albert@zeitkraut.de>
-copyright:           © 2022 Albert Krewinkel
+copyright:           © 2022 RStudio, PBC
 category:            Text
 extra-doc-files:     README.md
                    , CHANGELOG.md
