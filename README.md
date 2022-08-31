@@ -46,6 +46,29 @@ The first line must be used for headless tables:
     | a 1  | b 2    | c 3   |
     +------+--------+-------+
 
+## Table Foot
+
+This library implements an extension that enables to create tables
+with table foots: If the *last* separator line is a part
+separator, i.e., if it consists of `=` instead of `-`, then all
+rows after the *second-to-last* part separator are treated as the
+table foot.
+
+E.g., consider the following table:
+
+    +------+-------+
+    | Item | Price |
+    +======+=======+
+    | Eggs | 5£    |
+    +------+-------+
+    | Spam | 3£    |
+    +======+=======+
+    | Sum  | 8£    |
+    +======+=======+
+
+Here, the last row, containing "Sum" and "8£", would be the table
+foot.
+
 
 ## Algorithm
 
