@@ -2,6 +2,12 @@
 
 `gridtables` uses [PVP Versioning][].
 
+## gridtables-0.1.0.0
+
+Release pending.
+
+-   Added support for table foots.
+
 ## gridtables-0.0.3.0
 
 Released 2022-08-18.
