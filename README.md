@@ -22,7 +22,8 @@ tables, like the one given below.
 
 The tables are intended to look good when viewed in a monospace
 font. Therefore, wide and full-width characters, as those in East
-Asian scripts, are counted as two characters.
+Asian scripts, are counted as two characters, while zero-width and
+combining characters are treated as if they have no width.
 
 ## Column alignments
 
