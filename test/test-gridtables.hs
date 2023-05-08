@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE TupleSections     #-}
 {-|
 Module      : Main
 Copyright   : © 2022-2023 Posit Software, PBC
@@ -27,17 +28,17 @@ main = defaultMain $ testGroup "gridtables"
     ]
 
 parse' :: ParsecT Text () Identity a -> Text -> Either ParseError a
-parse' p t = runParser p () "<test input>" t
+parse' p = runParser p () "<test input>"
 
 -- | Test parsing into lines
 linesTests :: TestTree
 linesTests = testGroup "lines"
   [ testCase "get lines" $
     parse' (many1 tableLine) "| one | two |\n| three |\n| four |\n"
-    @?= Right ([ "| one | two |"
-               , "| three |"
-               , "| four |"
-               ])
+    @?= Right [ "| one | two |"
+              , "| three |"
+              , "| four |"
+              ]
 
   , testCase "fail if not a table" $
     parse' (many tableLine) "nope\nnada\n" @?= Right []
@@ -531,4 +532,4 @@ gridTableTests = testGroup "parseArrayTable"
 
 defaultAlign :: [Int] -> Array ColIndex (Alignment, Int)
 defaultAlign widths = listArray (1, ColIndex (length widths))
-                    $ map (\w -> (AlignDefault, w)) widths
+                    $ map (AlignDefault,) widths
