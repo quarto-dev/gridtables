@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleContexts   #-}
 {- |
 Module      : Text.GridTable
-Copyright   : © 2022 Albert Krewinkel
+Copyright   : © 2022-2023 Posit Software, PBC
 License     : MIT
 Maintainer  : Albert Krewinkel <albert@zeitkraut.de>
 
