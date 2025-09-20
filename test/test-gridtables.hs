@@ -372,6 +372,23 @@ gridTableTests = testGroup "parseArrayTable"
                 , arrayTableColSpecs = defaultAlign [10, 1]
                 })
 
+    , testCase "combined characters" $
+      let gt = T.unlines
+               [ "+---+------+"
+               , "| a | back |"
+               , "+===+======+"
+               , "| ø̞ | o̞    |"
+               , "+---+------+"
+               ]
+      in parse' gridTable gt @?=
+         Right (ArrayTable 
+                { arrayTableCells = listArray ((1,1),(2,2))
+                  [ ContentCell 1 1 [" a "], ContentCell 1 1 [" back "], ContentCell 1 1 [" ø̞ "], ContentCell 1 1 [" o̞    "]]
+                , arrayTableHead = Just 1
+                , arrayTableFoot = Nothing
+                , arrayTableColSpecs = defaultAlign [3, 6]
+                })
+
     ]
 
   , testCase "unterminated row" $
