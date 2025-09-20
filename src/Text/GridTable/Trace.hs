@@ -30,7 +30,7 @@ import Data.List (foldl')
 import Data.Maybe (fromMaybe)
 import Data.Set (Set)
 import Data.Text (Text)
-import Text.DocLayout (charWidth)
+import Text.DocLayout (charWidth, realLength)
 import Text.GridTable.ArrayTable
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -99,7 +99,7 @@ initialTraceInfo = TraceInfo
 -- | Converts a list of lines into a char array.
 toCharGrid :: [Text] -> CharGrid
 toCharGrid lines =
-  let chars = foldr (\t m -> max m (T.length t)) 0 lines -- potential overcount
+  let chars = foldr (\t m -> max m (realLength t)) 0 lines -- potential overcount
       gbounds = ( (CharRow 1, CharCol 1)
                 , (CharRow (length lines), CharCol chars)
                 )
