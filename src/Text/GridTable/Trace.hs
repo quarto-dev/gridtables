@@ -344,6 +344,7 @@ lastColumn = snd . snd . bounds
 lastRow :: CharGrid -> CharRow
 lastRow = fst . snd . bounds
 
+-- | Forgiving version of scanRight, allowing misaligned line ends
 scanRightRestOfLine :: CharGrid -> CharIndex -> CharRow -> Maybe ColSeps
 scanRightRestOfLine charGrid (_top, left) bottom =
   let  go :: CharCol -> Maybe ColSeps -> Maybe ColSeps
