@@ -31,15 +31,15 @@ jobs:
             cabal: '3.16'
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install recent cabal/ghc
-        uses: haskell/actions/setup@v2
+        uses: haskell-actions/setup@v2
         with:
           ghc-version: ${{ matrix.version.ghc }}
           cabal-version: ${{ matrix.version.cabal }}
 
-      - uses: actions/cache@v1
+      - uses: actions/cache@v4
         name: Cache ~/.cabal/store
         with:
           path: ~/.cabal/store
