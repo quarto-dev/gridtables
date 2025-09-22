@@ -2,9 +2,22 @@
 
 `gridtables` uses [PVP Versioning][].
 
+## gridtables-0.1.1.0
+
+Released 2025-09-22.
+
+-   Fixed length calculation for combined characters (Tuong Nguyen
+    Manh).
+
+-   Updated upper bound on text.
+
+-   Minor code and docs improvements.
+
+-   Added version bounds to all build dependencies.
+
 ## gridtables-0.1.0.0
 
-Release pending.
+Released 2022-09-30.
 
 -   Added support for table foots.
 
