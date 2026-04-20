@@ -12,15 +12,18 @@ license:             MIT
 license-file:        LICENSE
 author:              Albert Krewinkel
 maintainer:          Albert Krewinkel <albert@zeitkraut.de>
-copyright:           © 2022-2023 Posit Software, PBC
+copyright:           © 2022-2026 Posit Software, PBC
 category:            Text
 extra-doc-files:     README.md
                    , CHANGELOG.md
-tested-with:         GHC == 8.6.5
-                     GHC == 8.8.4
-                     GHC == 8.10.7
-                     GHC == 9.0.2
-                     GHC == 9.2.2
+tested-with:         GHC == 8.10.7
+                   , GHC == 9.0
+                   , GHC == 9.2
+                   , GHC == 9.4
+                   , GHC == 9.6
+                   , GHC == 9.8
+                   , GHC == 9.10
+                   , GHC == 9.12
 
 source-repository head
   type:                git
