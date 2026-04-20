@@ -59,7 +59,7 @@ common common-options
 library
   import:              common-options
   hs-source-dirs:      src
-  build-depends:       containers            >= 0.6      && < 0.8
+  build-depends:       containers            >= 0.6      && < 0.9
                      , doclayout             >= 0.4      && < 0.6
   exposed-modules:     Text.GridTable
                      , Text.GridTable.ArrayTable
