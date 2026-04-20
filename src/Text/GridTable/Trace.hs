@@ -411,7 +411,7 @@ tableFromTraceInfo traceInfo partSeps colSpecsFirstLine =
       colseps = Set.toAscList $ gridColSeps traceInfo
       rowindex = Map.fromList $ zip rowseps [1..]
       colindex = Map.fromList $ zip colseps [1..]
-      colwidths = [ b - a - 1 | (b, a) <- zip (tail colseps) colseps ]
+      colwidths = [ b - a - 1 | (b, a) <- zip (drop 1 colseps) colseps ]
       colSpecs = zip
                  (map colAlign
                    (case partSeps of
