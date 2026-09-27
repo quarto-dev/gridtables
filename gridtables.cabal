@@ -61,7 +61,7 @@ library
   import:              common-options
   hs-source-dirs:      src
   build-depends:       containers            >= 0.6      && < 0.9
-                     , doclayout             >= 0.4      && < 0.6
+                     , doclayout             >= 0.4      && < 0.7
   exposed-modules:     Text.GridTable
                      , Text.GridTable.ArrayTable
                      , Text.GridTable.Parse
