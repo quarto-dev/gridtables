@@ -27,7 +27,7 @@ import Data.Array.MArray
 import Data.Array.ST
 import Data.Function (on)
 import Data.List (foldl')
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, listToMaybe)
 import Data.Set (Set)
 import Data.Text (Text)
 import Text.DocLayout (charWidth, realLength)
@@ -412,13 +412,18 @@ tableFromTraceInfo traceInfo partSeps colSpecsFirstLine =
       rowindex = Map.fromList $ zip rowseps [1..]
       colindex = Map.fromList $ zip colseps [1..]
       colwidths = [ b - a - 1 | (b, a) <- zip (drop 1 colseps) colseps ]
+      alignSpecs = case partSeps of
+                     partSep:_ -> partSepColSpec partSep
+                     []        -> fromMaybe [] colSpecsFirstLine
+      -- A segment of the alignment line may span multiple columns;
+      -- each column gets the alignment of the segment containing it.
+      alignFor (left, right) = fromMaybe AlignDefault $ listToMaybe
+        [ colAlign cs | cs <- alignSpecs
+                      , colStart cs - 1 <= left
+                      , right <= colEnd cs ]
       colSpecs = zip
-                 (map colAlign
-                   (case partSeps of
-                       partSep:_ -> partSepColSpec partSep
-                       []        -> fromMaybe [] colSpecsFirstLine)
-                   ++ repeat AlignDefault)
-                 (map fromCharCol colwidths)
+                  (map alignFor (zip colseps (drop 1 colseps)))
+                  (map fromCharCol colwidths)
       lastCol = ColIndex (length colwidths)
       mlastLine = Set.lookupMax (gridRowSeps traceInfo)
       tableHead = case partSeps of

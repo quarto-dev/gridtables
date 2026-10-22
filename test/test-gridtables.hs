@@ -528,6 +528,42 @@ gridTableTests = testGroup "parseArrayTable"
                      , [Cell "3" 1 1]
                      ]
     ]
+  , testGroup "markers spanning multiple columns"
+    [ testCase "marker in first line" $
+      let gt = T.unlines
+               [ "+:------------:+---------------:+"
+               , "| Heading 1    | Heading 2      |"
+               , "+---+----+-----+----+------+----+"
+               , "| A | B  | C   | D  |  E   | F  |"
+               , "+---+----+-----+----+------+----+"
+               ]
+      in arrayTableColSpecs <$> parse' gridTable gt @?=
+         Right (listArray (1, 6)
+                [ (AlignCenter, 3)
+                , (AlignCenter, 4)
+                , (AlignCenter, 5)
+                , (AlignRight, 4)
+                , (AlignRight, 6)
+                , (AlignRight, 4)
+                ])
+
+    , testCase "marker in part separator" $
+      let gt = T.unlines
+               [ "+-------------+-------+"
+               , "| head        | c     |"
+               , "+:===========:+======:+"
+               , "| ab          | c     |"
+               , "+------+------+-------+"
+               , "| a    | b    | c     |"
+               , "+------+------+-------+"
+               ]
+      in arrayTableColSpecs <$> parse' gridTable gt @?=
+         Right (listArray (1, 3)
+                [ (AlignCenter, 6)
+                , (AlignCenter, 6)
+                , (AlignRight, 7)
+                ])
+    ]
   ]
 
 defaultAlign :: [Int] -> Array ColIndex (Alignment, Int)
