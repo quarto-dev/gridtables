@@ -33,15 +33,14 @@ jobs:
             cabal: '3.16'
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - name: Install recent cabal/ghc
-        uses: haskell-actions/setup@v2
-        with:
-          ghc-version: ${{ matrix.version.ghc }}
-          cabal-version: ${{ matrix.version.cabal }}
+      - name: Install cabal/ghc
+        run: |
+          ghcup install ghc --set ${{ matrix.versions.ghc }}
+          ghcup install cabal --set ${{ matrix.versions.cabal }}
 
-      - uses: actions/cache@v5
+      - uses: actions/cache@v6
         name: Cache ~/.cabal/store
         with:
           path: ~/.cabal/store
