@@ -4,11 +4,10 @@
 
 ## gridtables-0.1.1.1
 
--   Fix a bug in computing table alignments. When there are colspans
-    in the header, alignments weren't computed correctly. With this
-    patch, if a header cell with colspans has an alignment, that
-    alignment is given to all the columns spanned. Resolves
-    jgm/pandoc#9085.
+-   Fix a bug in computing table alignments with colspans (#3).
+    If a header cell with colspans has an alignment, that
+    alignment is given to all the columns spanned instead of
+    just the first.
 
 -   Bump version bound for doclayout.
 
