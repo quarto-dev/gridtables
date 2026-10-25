@@ -2,6 +2,22 @@
 
 `gridtables` uses [PVP Versioning][].
 
+## gridtables-0.1.1.1
+
+-   Fix a bug in computing table alignments. When there are colspans
+    in the header, alignments weren't computed correctly. With this
+    patch, if a header cell with colspans has an alignment, that
+    alignment is given to all the columns spanned. Resolves
+    jgm/pandoc#9085.
+
+-   Bump version bound for doclayout.
+
+-   Remove call to partial function `tail`.
+
+-   Allow containers 0.8.
+
+-   Fix list of tested GHC versions in cabal file.
+
 ## gridtables-0.1.1.0
 
 Released 2025-09-22.
