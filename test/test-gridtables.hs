@@ -490,6 +490,39 @@ gridTableTests = testGroup "parseArrayTable"
               , arrayTableColSpecs = defaultAlign [3, 3]
               })
 
+  , testCase "part separator without closing plus" $
+    let ls = T.unlines
+             [ "+---+"
+             , "| a |"
+             , "+===="
+             , "| b |"
+             , "+---+"
+             ]
+    in parse' gridTable ls @?=
+       Right (ArrayTable
+              { arrayTableCells = listArray ((1,1), (2,1))
+                                 [ ContentCell 2 1 [" a ", "===", " b "]
+                                 , ContinuationCell (1,1)]
+              , arrayTableHead = Nothing
+              , arrayTableFoot = Nothing
+              , arrayTableColSpecs = defaultAlign [3]
+              })
+
+  , testCase "unterminated row ending in a combining character" $
+    let ls = T.unlines
+             [ "+---+"
+             , "| e\x0301"
+             , "+---+"
+             ]
+    in parse' gridTable ls @?=
+       Right (ArrayTable
+              { arrayTableCells = listArray ((1,1), (1,1))
+                                 [ ContentCell 1 1 [" e\x0301"]]
+              , arrayTableHead = Nothing
+              , arrayTableFoot = Nothing
+              , arrayTableColSpecs = defaultAlign [3]
+              })
+
   , testCase "followed by non-empty line" $
     let ls = T.unlines
              [ "+-----+"
