@@ -108,7 +108,7 @@ toCharGrid lines =
         2 -> C c : WP : toGChars cs
         1 -> C c : toGChars cs
         _ -> case span ((== 0) . charWidth) cs of
-               (zw, [])     -> [CZ (c:zw) '\0']
+               (zw, [])     -> CZ (c:zw) '\0' : repeat Missing
                (zw, c':cs') -> CZ (c:zw) c' :
                                case charWidth c' of
                                  2 -> WP : toGChars cs'
@@ -176,14 +176,17 @@ colSpecsInLine c charGrid i =
                   , colAlign = align
                   }
             in pure (pure colspec)
-    findEnd j = case charGrid ! (i, j) of
-      C '+' -> pure (j, False)
-      C ':' -> if charGrid ! (i, j + 1) == C '+'
-                  then pure (j + 1, True)
-                  else Nothing
-      C c'
-        | c' == c -> findEnd (j + 1)
-      _           -> Nothing
+    -- a line that ends without a closing @+@ is no separator
+    findEnd j
+      | j > lastCol = Nothing
+      | otherwise = case charGrid ! (i, j) of
+          C '+' -> pure (j, False)
+          C ':' -> if j < lastCol && charGrid ! (i, j + 1) == C '+'
+                      then pure (j + 1, True)
+                      else Nothing
+          C c'
+            | c' == c -> findEnd (j + 1)
+          _           -> Nothing
 
 -- | Returns new character grid in which the given lines have been
 -- converted to normal cell-separating lines.
@@ -380,7 +383,7 @@ getLines charGrid (top, left) (bottom, right) =
       colIdxs = [left + 1 .. right - 1]
       toChars rowIdx colIdx = case charGrid ! (rowIdx, colIdx) of
         C c     -> [c]
-        CZ zw c -> zw ++ [c]
+        CZ zw c -> zw ++ [c | c /= '\0']  -- '\0': zero-width chars ended the line
         _       -> []
   in map (\ir -> T.pack $ concatMap (toChars ir) colIdxs)
          rowIdxs
